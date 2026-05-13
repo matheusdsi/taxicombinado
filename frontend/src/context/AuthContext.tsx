@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { api, syncLocalQuotes } from '@/lib/api';
 import { getUnsyncedLocalQuotes, markLocalQuotesSynced } from '@/lib/localQuotes';
 
@@ -27,10 +28,18 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isAdminArea = pathname?.startsWith('/admin') ?? false;
   const [driver, setDriver] = useState<Driver | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    if (isAdminArea) {
+      setDriver(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await api.get('/api/auth/driver/me');
       setDriver(res.data.data);
@@ -44,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdminArea]);
 
   const logout = useCallback(async () => {
     try {
