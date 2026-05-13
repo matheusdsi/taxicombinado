@@ -21,6 +21,12 @@ export function Header() {
         </Link>
 
         <nav className="flex items-center gap-2 sm:gap-3 text-sm font-medium">
+          <Link
+            href="/agendar"
+            className="text-xs text-taxi-600 font-semibold hover:text-taxi-800 transition-colors hidden sm:block"
+          >
+            Agendar corrida
+          </Link>
           {!loading && (
             driver ? (
               <div className="flex items-center gap-2">

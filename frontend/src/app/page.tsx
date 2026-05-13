@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Link from 'next/link';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { TaxiQuoteForm } from '@/components/quote/TaxiQuoteForm';
 import { QuoteResultCard } from '@/components/quote/QuoteResultCard';
@@ -52,6 +53,21 @@ export default function HomePage() {
 
   return (
     <PageContainer>
+      {!result && (
+        <Link
+          href="/agendar"
+          className="flex items-center justify-between bg-taxi-50 border border-taxi-200 rounded-2xl px-4 py-3 mb-4 hover:bg-taxi-100 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🚖</span>
+            <div>
+              <p className="text-sm font-semibold text-taxi-800">Precisa de um táxi?</p>
+              <p className="text-xs text-taxi-600">Agende sua corrida com antecedência</p>
+            </div>
+          </div>
+          <span className="text-taxi-500 text-lg group-hover:translate-x-0.5 transition-transform">→</span>
+        </Link>
+      )}
       {!result ? (
         <TaxiQuoteForm onResult={handleResult} />
       ) : (

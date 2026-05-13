@@ -354,3 +354,25 @@ model AppFeedback {
 
   @@map("app_feedback")
 }
+
+model RideRequest {
+  id                 String   @id @default(uuid())
+  passengerName      String   @map("passenger_name")
+  passengerPhone     String   @map("passenger_phone")
+  originAddress      String   @map("origin_address")
+  destinationAddress String   @map("destination_address")
+  scheduledDate      String   @map("scheduled_date")
+  scheduledTime      String   @map("scheduled_time")
+  passengerCount     Int      @default(1) @map("passenger_count")
+  needsLargeVehicle  Boolean  @default(false) @map("needs_large_vehicle")
+  needsAccessibility Boolean  @default(false) @map("needs_accessibility")
+  hasLuggage         Boolean  @default(false) @map("has_luggage")
+  notes              String?
+  estimatedPriceMin  Float?   @map("estimated_price_min")
+  estimatedPriceMax  Float?   @map("estimated_price_max")
+  estimatedDistanceKm Float?  @map("estimated_distance_km")
+  status             String   @default("new")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@map("ride_requests")
+}
