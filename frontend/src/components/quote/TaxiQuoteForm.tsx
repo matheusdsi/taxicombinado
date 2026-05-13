@@ -240,15 +240,9 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     });
 
     try {
-      const estimatedMinutes = routeInfo?.durationMinutes
-        ? data.tripType === 'round_trip'
-          ? routeInfo.durationMinutes * 2
-          : routeInfo.durationMinutes
-        : 0;
-
       const response = await calculateQuote({
         ...data,
-        estimatedMinutes,
+        estimatedMinutes: 0,
         vehicleExtraCostPerKm: 0,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,

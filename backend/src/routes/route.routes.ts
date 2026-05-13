@@ -47,8 +47,17 @@ router.post('/calculate', async (req: Request, res: Response) => {
     if (error instanceof ZodError) {
       return res.status(400).json({ success: false, error: 'Dados inválidos', details: error.errors });
     }
-    console.error('Error calculating route:', error);
-    return res.status(500).json({ success: false, error: 'Erro ao calcular rota' });
+    console.warn('Automatic route calculation unavailable:', error instanceof Error ? error.message : error);
+    return res.json({
+      success: true,
+      data: {
+        distanceKm: null,
+        durationMinutes: null,
+        polyline: null,
+        provider: 'manual',
+        message: 'Cálculo automático indisponível. Informe a distância manualmente.',
+      },
+    });
   }
 });
 
