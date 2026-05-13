@@ -9,6 +9,7 @@ function buildProxyHeaders(request: NextRequest) {
   headers.delete('connection');
   headers.delete('content-length');
   headers.delete('accept-encoding');
+  headers.delete('origin');
   headers.delete('x-forwarded-host');
   headers.delete('x-forwarded-proto');
   headers.delete('x-forwarded-port');

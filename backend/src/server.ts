@@ -13,9 +13,18 @@ import placesRoutes from './routes/places.routes';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const FRONTEND_URLS = [
+  FRONTEND_URL,
+  ...(process.env.FRONTEND_URLS || '').split(','),
+  'https://www.taxicombinado.com.br',
+  'https://taxicombinado.com.br',
+  'https://taxicombinado.vercel.app',
+]
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 const allowedOrigins = [
-  FRONTEND_URL,
+  ...FRONTEND_URLS,
   'http://localhost:3000',
   'http://localhost:3001',
 ];
