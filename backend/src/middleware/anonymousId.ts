@@ -17,6 +17,7 @@ const DRIVER_COOKIE = 'pct_driver_session';
 const COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+const isProduction = process.env.NODE_ENV === 'production';
 
 export async function anonymousIdMiddleware(
   req: Request,
@@ -62,8 +63,8 @@ export async function anonymousIdMiddleware(
     res.cookie(ANON_COOKIE, anonymousId, {
       maxAge: COOKIE_MAX_AGE,
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
       path: '/',
     });
 

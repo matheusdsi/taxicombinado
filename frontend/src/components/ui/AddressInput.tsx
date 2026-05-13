@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/lib/apiConfig';
 
 interface Suggestion {
   label: string;
@@ -15,8 +16,6 @@ interface AddressInputProps {
   hint?: string;
   prefix?: React.ReactNode;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export function AddressInput({ label, value, onChange, placeholder, hint, prefix }: AddressInputProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -33,7 +32,7 @@ export function AddressInput({ label, value, onChange, placeholder, hint, prefix
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/places/autocomplete?q=${encodeURIComponent(q)}`, {
+      const res = await fetch(apiUrl(`/api/places/autocomplete?q=${encodeURIComponent(q)}`), {
         credentials: 'include',
       });
       const data = await res.json();

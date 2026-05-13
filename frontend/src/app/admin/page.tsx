@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { formatCurrencyBRL, formatDistance, formatDuration } from '@/lib/formatters';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiUrl } from '@/lib/apiConfig';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -163,7 +162,7 @@ export default function AdminPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/api/admin/stats`, { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/admin/stats'), { credentials: 'include' });
       if (res.status === 401 || res.status === 403) {
         window.location.href = '/admin/login';
         return;
@@ -182,7 +181,7 @@ export default function AdminPage() {
   useEffect(() => {
     async function init() {
       try {
-        const me = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' });
+        const me = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' });
         if (!me.ok) { window.location.href = '/admin/login'; return; }
         const { data } = await me.json();
         setUser(data);
@@ -202,7 +201,7 @@ export default function AdminPage() {
   }, [stats, fetchStats]);
 
   async function handleLogout() {
-    await fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    await fetch(apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
     window.location.href = '/admin/login';
   }
 

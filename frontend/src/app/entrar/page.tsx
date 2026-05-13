@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiUrl } from '@/lib/apiConfig';
 
 export default function EntrarPage() {
   const router = useRouter();
@@ -18,7 +17,7 @@ export default function EntrarPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/api/auth/driver/login`, {
+      const res = await fetch(apiUrl('/api/auth/driver/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
