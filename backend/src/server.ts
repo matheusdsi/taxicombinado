@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -7,6 +8,7 @@ import routeRoutes from './routes/route.routes';
 import partnerRoutes from './routes/partner.routes';
 import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.routes';
+import placesRoutes from './routes/places.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +60,9 @@ app.use('/api/auth', authRoutes);
 
 // Admin
 app.use('/api/admin', adminRoutes);
+
+// Places autocomplete
+app.use('/api/places', placesRoutes);
 
 // Standalone endpoints that map to partner router handlers
 app.use('/api/partner-leads', (req, _res, next) => {

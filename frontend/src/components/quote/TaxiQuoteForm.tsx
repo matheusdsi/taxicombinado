@@ -8,6 +8,7 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { NumberInput } from '@/components/ui/NumberInput';
 import { ToggleGroup } from '@/components/ui/ToggleGroup';
 import { LoadingButton } from '@/components/ui/LoadingButton';
+import { AddressInput } from '@/components/ui/AddressInput';
 import { calculateQuote, QuoteResult } from '@/lib/api';
 
 // ─── Presets de tarifa SP ─────────────────────────────────────
@@ -156,19 +157,21 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       {/* ─── Seção 1: Rota ─── */}
       <Section title="Rota" icon="🗺️">
         <Controller name="originAddress" control={control} render={({ field }) => (
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Origem <span className="text-gray-400 font-normal">(opcional)</span></label>
-            <input {...field} type="text" placeholder="Ex: Sé, São Paulo"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-taxi-500 focus:ring-2 focus:ring-taxi-100 transition-all" />
-          </div>
+          <AddressInput
+            label="Origem (opcional)"
+            value={field.value ?? ''}
+            onChange={field.onChange}
+            placeholder="Ex: Sé, São Paulo"
+          />
         )} />
 
         <Controller name="destinationAddress" control={control} render={({ field }) => (
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Destino <span className="text-gray-400 font-normal">(opcional)</span></label>
-            <input {...field} type="text" placeholder="Ex: Congonhas, São Paulo"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base outline-none focus:border-taxi-500 focus:ring-2 focus:ring-taxi-100 transition-all" />
-          </div>
+          <AddressInput
+            label="Destino (opcional)"
+            value={field.value ?? ''}
+            onChange={field.onChange}
+            placeholder="Ex: Congonhas, São Paulo"
+          />
         )} />
 
         <Controller name="tripType" control={control} render={({ field }) => (
