@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_URL = process.env.API_URL?.replace(/\/+$/, '');
 
+function buildProxyHeaders(request: NextRequest) {
+  const headers = new Headers(request.headers);
+
+  headers.delete('host');
+  headers.delete('connection');
+  headers.delete('content-length');
+  headers.delete('accept-encoding');
+  headers.delete('x-forwarded-host');
+  headers.delete('x-forwarded-proto');
+  headers.delete('x-forwarded-port');
+
+  return headers;
+}
+
 async function proxy(request: NextRequest, pathParts: string[]) {
   if (!API_URL) {
     return NextResponse.json(
@@ -17,7 +31,7 @@ async function proxy(request: NextRequest, pathParts: string[]) {
 
   const response = await fetch(targetUrl, {
     method: request.method,
-    headers: request.headers,
+    headers: buildProxyHeaders(request),
     body,
     redirect: 'manual',
   });
