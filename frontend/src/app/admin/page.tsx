@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { apiUrl } from '@/lib/apiConfig';
 import { formatCurrencyBRL, formatDistance, formatDuration } from '@/lib/formatters';
 
@@ -88,6 +89,34 @@ interface FeatureFlags {
   showRouteSteps: boolean;
 }
 
+interface AdminPartner {
+  id: string;
+  name: string;
+  category: string;
+  description?: string | null;
+  logoUrl?: string | null;
+  websiteUrl?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  isActive: boolean;
+  isPremium: boolean;
+  sortOrder: number;
+  _count: { clicks: number; leads: number };
+}
+
+interface PartnerFormState {
+  name: string;
+  category: string;
+  description: string;
+  logoUrl: string;
+  websiteUrl: string;
+  phone: string;
+  city: string;
+  isActive: boolean;
+  isPremium: boolean;
+  sortOrder: string;
+}
+
 type TabId = 'master' | 'quotes' | 'audience' | 'partners' | 'feedback' | 'system';
 
 const TRIP_TYPE_LABEL: Record<string, string> = {
@@ -124,6 +153,19 @@ const TABS: { id: TabId; label: string; description: string }[] = [
   { id: 'feedback', label: 'Feedback', description: 'Notas e mensagens' },
   { id: 'system', label: 'Sistema', description: 'Controles ativos' },
 ];
+
+const EMPTY_PARTNER_FORM: PartnerFormState = {
+  name: '',
+  category: '',
+  description: '',
+  logoUrl: '',
+  websiteUrl: '',
+  phone: '',
+  city: '',
+  isActive: true,
+  isPremium: false,
+  sortOrder: '0',
+};
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '-';
@@ -240,8 +282,12 @@ function TopList({ items, total }: { items: { label: string; count: number; sub?
 export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [flags, setFlags] = useState<FeatureFlags | null>(null);
+  const [adminPartners, setAdminPartners] = useState<AdminPartner[]>([]);
+  const [partnerForm, setPartnerForm] = useState<PartnerFormState>(EMPTY_PARTNER_FORM);
   const [loading, setLoading] = useState(true);
   const [savingFlag, setSavingFlag] = useState(false);
+  const [savingPartner, setSavingPartner] = useState(false);
+  const [loadingPartners, setLoadingPartners] = useState(false);
   const [error, setError] = useState('');
   const [user, setUser] = useState<{ name?: string | null; email: string } | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('master');
@@ -251,6 +297,20 @@ export default function AdminPage() {
     if (!res.ok) return;
     const json = await res.json();
     setFlags(json.data);
+  }, []);
+
+  const fetchAdminPartners = useCallback(async () => {
+    setLoadingPartners(true);
+    try {
+      const res = await fetch(apiUrl('/api/admin/partners'), { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao carregar parceiros');
+      setAdminPartners(json.data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao carregar parceiros');
+    } finally {
+      setLoadingPartners(false);
+    }
   }, []);
 
   const fetchStats = useCallback(async () => {
@@ -265,10 +325,11 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(json.error || 'Erro ao carregar dados do admin');
       setStats(json.data);
       await fetchSettings();
+      await fetchAdminPartners();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar dados do admin');
     }
-  }, [fetchSettings]);
+  }, [fetchAdminPartners, fetchSettings]);
 
   useEffect(() => {
     async function init() {
@@ -318,6 +379,52 @@ export default function AdminPage() {
       setError(e instanceof Error ? e.message : 'Erro ao salvar configuracao');
     } finally {
       setSavingFlag(false);
+    }
+  }
+
+  async function handleCreatePartner(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingPartner(true);
+    setError('');
+    try {
+      const payload = {
+        ...partnerForm,
+        sortOrder: Number(partnerForm.sortOrder || 0),
+      };
+      const res = await fetch(apiUrl('/api/admin/partners'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao cadastrar parceiro');
+      setPartnerForm(EMPTY_PARTNER_FORM);
+      await fetchAdminPartners();
+      await fetchStats();
+      setActiveTab('partners');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao cadastrar parceiro');
+    } finally {
+      setSavingPartner(false);
+    }
+  }
+
+  async function updatePartner(partnerId: string, patch: Partial<Pick<AdminPartner, 'isActive' | 'isPremium'>>) {
+    setError('');
+    try {
+      const res = await fetch(apiUrl(`/api/admin/partners/${partnerId}`), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao atualizar parceiro');
+      setAdminPartners((current) => current.map((partner) => (partner.id === partnerId ? json.data : partner)));
+      await fetchStats();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao atualizar parceiro');
     }
   }
 
@@ -604,6 +711,182 @@ export default function AdminPage() {
                 <MetricCard label="Leads totais" value={overview.totalLeads} tone="yellow" />
                 <MetricCard label="Conversao lead" value={`${computed.leadRate.toFixed(1)}%`} tone="blue" />
               </div>
+
+              <Card className="p-5">
+                <SectionHeader title="Cadastrar parceiro" eyebrow="Novo" />
+                <form onSubmit={handleCreatePartner} className="grid gap-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Nome</span>
+                      <input
+                        required
+                        value={partnerForm.name}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, name: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="Ex: Oficina Sao Jose"
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Categoria</span>
+                      <input
+                        required
+                        value={partnerForm.category}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, category: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="Ex: oficina, seguro, guincho"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="grid gap-1">
+                    <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Descricao</span>
+                    <textarea
+                      value={partnerForm.description}
+                      onChange={(event) => setPartnerForm((form) => ({ ...form, description: event.target.value }))}
+                      className="min-h-[86px] rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                      placeholder="Resumo curto que aparece para o motorista."
+                    />
+                  </label>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Telefone</span>
+                      <input
+                        value={partnerForm.phone}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, phone: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="(11) 99999-9999"
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Cidade</span>
+                      <input
+                        value={partnerForm.city}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, city: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="Sao Paulo"
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Site</span>
+                      <input
+                        type="url"
+                        value={partnerForm.websiteUrl}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, websiteUrl: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="https://..."
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Logo URL</span>
+                      <input
+                        type="url"
+                        value={partnerForm.logoUrl}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, logoUrl: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="https://..."
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-lg bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap gap-3">
+                      <label className="flex items-center gap-2 text-sm font-black text-zinc-700">
+                        <input
+                          type="checkbox"
+                          checked={partnerForm.isActive}
+                          onChange={(event) => setPartnerForm((form) => ({ ...form, isActive: event.target.checked }))}
+                          className="h-4 w-4 accent-zinc-950"
+                        />
+                        Ativo
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-black text-zinc-700">
+                        <input
+                          type="checkbox"
+                          checked={partnerForm.isPremium}
+                          onChange={(event) => setPartnerForm((form) => ({ ...form, isPremium: event.target.checked }))}
+                          className="h-4 w-4 accent-zinc-950"
+                        />
+                        Premium
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-black text-zinc-700">
+                        Ordem
+                        <input
+                          type="number"
+                          value={partnerForm.sortOrder}
+                          onChange={(event) => setPartnerForm((form) => ({ ...form, sortOrder: event.target.value }))}
+                          className="w-20 rounded-lg border border-zinc-200 px-2 py-2 text-sm font-bold outline-none focus:border-zinc-950"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      disabled={savingPartner}
+                      className="rounded-lg bg-zinc-950 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingPartner ? 'Cadastrando...' : 'Cadastrar parceiro'}
+                    </button>
+                  </div>
+                </form>
+              </Card>
+
+              <Card className="p-5">
+                <SectionHeader title="Parceiros cadastrados" eyebrow={`${adminPartners.length} registros`} />
+                {loadingPartners ? (
+                  <EmptyState>Carregando parceiros...</EmptyState>
+                ) : adminPartners.length === 0 ? (
+                  <EmptyState>Nenhum parceiro cadastrado ainda.</EmptyState>
+                ) : (
+                  <div className="grid gap-3">
+                    {adminPartners.map((partner) => (
+                      <div key={partner.id} className="rounded-lg border border-zinc-200 p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-black text-zinc-950">{partner.name}</p>
+                              <span className={`rounded-full px-2 py-1 text-[11px] font-black ${partner.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                                {partner.isActive ? 'Ativo' : 'Inativo'}
+                              </span>
+                              {partner.isPremium && <span className="rounded-full bg-taxi-50 px-2 py-1 text-[11px] font-black text-taxi-800">Premium</span>}
+                            </div>
+                            <p className="mt-1 text-sm font-bold text-zinc-500">
+                              {partner.category}
+                              {partner.city ? ` · ${partner.city}` : ''}
+                            </p>
+                            {partner.description && <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-zinc-600">{partner.description}</p>}
+                            <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-zinc-400">
+                              <span>{partner._count.clicks} cliques</span>
+                              <span>{partner._count.leads} leads</span>
+                              {partner.phone && <span>{partner.phone}</span>}
+                              {partner.websiteUrl && (
+                                <a className="text-sky-700" href={partner.websiteUrl} target="_blank" rel="noreferrer">
+                                  Abrir site
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <button
+                              onClick={() => updatePartner(partner.id, { isPremium: !partner.isPremium })}
+                              className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-black text-zinc-700 hover:bg-zinc-50"
+                            >
+                              {partner.isPremium ? 'Remover premium' : 'Marcar premium'}
+                            </button>
+                            <button
+                              onClick={() => updatePartner(partner.id, { isActive: !partner.isActive })}
+                              className={`rounded-lg px-3 py-2 text-xs font-black ${
+                                partner.isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {partner.isActive ? 'Desativar' : 'Ativar'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
               <div className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr]">
                 <Card className="p-5">
                   <SectionHeader title="Parceiros mais clicados" />

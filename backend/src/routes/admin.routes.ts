@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { z, ZodError } from 'zod';
 import { prisma } from '../lib/prisma';
 import { getFlags, setFlag } from '../lib/featureFlags';
 
@@ -25,6 +26,26 @@ async function requireAdminSession(req: Request, res: Response, next: NextFuncti
 }
 
 router.use(requireAdminSession);
+
+const adminPartnerSchema = z.object({
+  name: z.string().min(2),
+  category: z.string().min(2),
+  description: z.string().optional().or(z.literal('')),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  websiteUrl: z.string().url().optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
+  city: z.string().optional().or(z.literal('')),
+  isActive: z.boolean().optional(),
+  isPremium: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});
+
+const adminPartnerUpdateSchema = adminPartnerSchema.partial();
+
+function emptyToNull(value?: string): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
 // ─── GET /api/admin/stats ─────────────────────────────────────
 router.get('/stats', async (_req: Request, res: Response) => {
@@ -344,6 +365,92 @@ router.post('/settings', (req: Request, res: Response) => {
     setFlag('showRouteSteps', showRouteSteps);
   }
   return res.json({ success: true, data: getFlags() });
+});
+
+// ─── GET /api/admin/partners ─────────────────────────────────────
+router.get('/partners', async (_req: Request, res: Response) => {
+  try {
+    const partners = await prisma.partner.findMany({
+      orderBy: [{ isActive: 'desc' }, { isPremium: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      include: {
+        _count: { select: { clicks: true, leads: true } },
+      },
+    });
+
+    return res.json({ success: true, data: partners });
+  } catch (error) {
+    console.error('Admin partners list error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar parceiros' });
+  }
+});
+
+// ─── POST /api/admin/partners ────────────────────────────────────
+router.post('/partners', async (req: Request, res: Response) => {
+  try {
+    const input = adminPartnerSchema.parse(req.body);
+
+    const partner = await prisma.partner.create({
+      data: {
+        name: input.name.trim(),
+        category: input.category.trim(),
+        description: emptyToNull(input.description),
+        logoUrl: emptyToNull(input.logoUrl),
+        websiteUrl: emptyToNull(input.websiteUrl),
+        phone: emptyToNull(input.phone),
+        city: emptyToNull(input.city),
+        isActive: input.isActive ?? true,
+        isPremium: input.isPremium ?? false,
+        sortOrder: input.sortOrder ?? 0,
+      },
+      include: {
+        _count: { select: { clicks: true, leads: true } },
+      },
+    });
+
+    return res.status(201).json({ success: true, data: partner });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ success: false, error: 'Dados invalidos', details: error.errors });
+    }
+    console.error('Admin partner create error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao cadastrar parceiro' });
+  }
+});
+
+// ─── PATCH /api/admin/partners/:id ───────────────────────────────
+router.patch('/partners/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const input = adminPartnerUpdateSchema.parse(req.body);
+
+    const data: Record<string, string | number | boolean | null> = {};
+    if (input.name !== undefined) data.name = input.name.trim();
+    if (input.category !== undefined) data.category = input.category.trim();
+    if (input.description !== undefined) data.description = emptyToNull(input.description);
+    if (input.logoUrl !== undefined) data.logoUrl = emptyToNull(input.logoUrl);
+    if (input.websiteUrl !== undefined) data.websiteUrl = emptyToNull(input.websiteUrl);
+    if (input.phone !== undefined) data.phone = emptyToNull(input.phone);
+    if (input.city !== undefined) data.city = emptyToNull(input.city);
+    if (input.isActive !== undefined) data.isActive = input.isActive;
+    if (input.isPremium !== undefined) data.isPremium = input.isPremium;
+    if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
+
+    const partner = await prisma.partner.update({
+      where: { id },
+      data,
+      include: {
+        _count: { select: { clicks: true, leads: true } },
+      },
+    });
+
+    return res.json({ success: true, data: partner });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ success: false, error: 'Dados invalidos', details: error.errors });
+    }
+    console.error('Admin partner update error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao atualizar parceiro' });
+  }
 });
 
 function round2(n: number | null | undefined): number | null {
