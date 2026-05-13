@@ -12,30 +12,48 @@ import { calculateQuote, calculateRoute, QuoteResult, RouteStep } from '@/lib/ap
 
 const PRESETS = {
   comum: { baseFare: 6.55, pricePerKm: 4.8, waitingPrice: 55.5 / 60, waitingChargeType: 'per_minute' as const },
-  luxo:  { baseFare: 9.83, pricePerKm: 7.2, waitingPrice: 83.25 / 60, waitingChargeType: 'per_minute' as const },
+  luxo: { baseFare: 9.83, pricePerKm: 7.2, waitingPrice: 83.25 / 60, waitingChargeType: 'per_minute' as const },
 };
 
+const TRIP_TYPE_EXPLANATIONS = [
+  {
+    value: 'one_way',
+    title: 'Só ida',
+    text: 'Considera apenas o trajeto de ida. Cobra km, tempo, pedágio de ida e os custos informados.',
+  },
+  {
+    value: 'round_trip',
+    title: 'Ida e volta',
+    text: 'Considera ida + volta como corrida cobrada. Soma os dois trajetos no km, tempo e pedágios.',
+  },
+  {
+    value: 'empty_return',
+    title: 'Volta vazia',
+    text: 'O passageiro paga só a ida, mas a volta entra nos seus custos para você não voltar no prejuízo.',
+  },
+] as const;
+
 const schema = z.object({
-  originAddress:      z.string().optional(),
+  originAddress: z.string().optional(),
   destinationAddress: z.string().optional(),
-  tripType:           z.enum(['one_way', 'round_trip', 'empty_return']),
-  routeMode:          z.enum(['manual', 'automatic']),
-  distanceKm:         z.number({ invalid_type_error: 'Informe a distância' }).positive('Deve ser positivo'),
-  returnDistanceKm:   z.number().min(0).optional(),
+  tripType: z.enum(['one_way', 'round_trip', 'empty_return']),
+  routeMode: z.enum(['manual', 'automatic']),
+  distanceKm: z.number({ invalid_type_error: 'Informe a distância' }).positive('Deve ser positivo'),
+  returnDistanceKm: z.number().min(0).optional(),
   consumptionKmPerLiter: z.number().positive('Informe o consumo'),
-  fuelPricePerLiter:     z.number().positive('Informe o preço'),
-  fuelType:              z.string(),
-  baseFare:              z.number().min(0),
-  pricePerKm:            z.number().min(0),
-  waitingPrice:          z.number().min(0),
-  waitingChargeType:     z.enum(['per_minute', 'per_hour']),
-  flagMultiplier:        z.number().min(1).max(3),
-  tollOutbound:          z.number().min(0),
-  tollReturn:            z.number().min(0),
-  parkingCost:           z.number().min(0),
-  extraCosts:            z.number().min(0),
-  desiredMarginPercent:  z.number().min(0).max(80),
-  customChargedPrice:    z.number().min(0).optional(),
+  fuelPricePerLiter: z.number().positive('Informe o preço'),
+  fuelType: z.string(),
+  baseFare: z.number().min(0),
+  pricePerKm: z.number().min(0),
+  waitingPrice: z.number().min(0),
+  waitingChargeType: z.enum(['per_minute', 'per_hour']),
+  flagMultiplier: z.number().min(1).max(3),
+  tollOutbound: z.number().min(0),
+  tollReturn: z.number().min(0),
+  parkingCost: z.number().min(0),
+  extraCosts: z.number().min(0),
+  desiredMarginPercent: z.number().min(0).max(80),
+  customChargedPrice: z.number().min(0).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -108,24 +126,24 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tripType:             'one_way',
-      routeMode:            'manual',
-      distanceKm:           0,
-      returnDistanceKm:     0,
+      tripType: 'one_way',
+      routeMode: 'manual',
+      distanceKm: 0,
+      returnDistanceKm: 0,
       consumptionKmPerLiter: 11,
-      fuelPricePerLiter:    6.29,
-      fuelType:             'gasoline',
-      baseFare:             6.50,
-      pricePerKm:           3.80,
-      waitingPrice:         1.20,
-      waitingChargeType:    'per_minute',
-      flagMultiplier:       1.0,
-      tollOutbound:         0,
-      tollReturn:           0,
-      parkingCost:          0,
-      extraCosts:           0,
+      fuelPricePerLiter: 6.29,
+      fuelType: 'gasoline',
+      baseFare: 6.50,
+      pricePerKm: 3.80,
+      waitingPrice: 1.20,
+      waitingChargeType: 'per_minute',
+      flagMultiplier: 1.0,
+      tollOutbound: 0,
+      tollReturn: 0,
+      parkingCost: 0,
+      extraCosts: 0,
       desiredMarginPercent: 60,
-      customChargedPrice:   undefined,
+      customChargedPrice: undefined,
     },
   });
 
@@ -190,10 +208,10 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
         stops: [],
-        tollOutbound:  data.tollOutbound  ?? 0,
-        tollReturn:    data.tollReturn    ?? 0,
-        parkingCost:   data.parkingCost   ?? 0,
-        extraCosts:    data.extraCosts    ?? 0,
+        tollOutbound: data.tollOutbound ?? 0,
+        tollReturn: data.tollReturn ?? 0,
+        parkingCost: data.parkingCost ?? 0,
+        extraCosts: data.extraCosts ?? 0,
         desiredMarginPercent: data.desiredMarginPercent ?? 60,
         customChargedPrice: data.customChargedPrice && data.customChargedPrice > 0 ? data.customChargedPrice : undefined,
       });
@@ -223,7 +241,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
           <span style={{ color: 'var(--yellow)' }}>sem sair no prejuízo.</span>
         </div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', marginTop: 8 }}>
-          Digite os dados da corrida combinada — fazemos a conta certinha.
+          Digite os dados da corrida combinada — você receberá valores estimados.
         </div>
       </div>
 
@@ -263,10 +281,28 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         <Controller name="tripType" control={control} render={({ field }) => (
           <Field label="Tipo de corrida">
             <Seg value={field.value} onChange={field.onChange} options={[
-              { value: 'one_way',      label: 'Só ida' },
-              { value: 'round_trip',   label: 'Ida e volta' },
+              { value: 'one_way', label: 'Só ida' },
+              { value: 'round_trip', label: 'Ida e volta' },
               { value: 'empty_return', label: 'Volta vazia' },
             ]} />
+            <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Como o cálculo considera
+              </div>
+              {TRIP_TYPE_EXPLANATIONS.map((item) => {
+                const active = field.value === item.value;
+                return (
+                  <div key={item.value} style={{ display: 'grid', gridTemplateColumns: '82px 1fr', gap: 8, alignItems: 'start' }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: active ? 'var(--ink)' : 'var(--gray-500)' }}>
+                      {item.title}
+                    </span>
+                    <span style={{ fontSize: 12, lineHeight: 1.35, color: active ? 'var(--ink)' : 'var(--gray-500)', fontWeight: active ? 700 : 500 }}>
+                      {item.text}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </Field>
         )} />
 
@@ -281,7 +317,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         {!routeLoading && routeInfo && (
           <div style={{ background: 'var(--green-soft)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 7"/></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 7" /></svg>
               <div>
                 <span style={{ fontSize: 14, fontWeight: 800, color: '#14532D' }}>{routeInfo.distanceKm.toFixed(1)} km</span>
                 <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}> · {Math.round(routeInfo.durationMinutes)} min estimados</span>
@@ -297,7 +333,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         {!routeLoading && !routeInfo && routeManualFallback && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ background: 'var(--orange-soft)', color: '#7C2D12', borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M12 4l9 16H3L12 4Z"/><path d="M12 10v4M12 17h.01"/></svg>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M12 4l9 16H3L12 4Z" /><path d="M12 10v4M12 17h.01" /></svg>
               Cálculo automático indisponível. Informe a distância manualmente.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: tripType !== 'one_way' ? '1fr 1fr' : '1fr', gap: 10 }}>
@@ -341,12 +377,12 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <Seg value={field.value} onChange={field.onChange} options={[
                 { value: 'gasoline', label: 'Gasolina' },
-                { value: 'ethanol',  label: 'Etanol' },
-                { value: 'gnv',      label: 'GNV' },
+                { value: 'ethanol', label: 'Etanol' },
+                { value: 'gnv', label: 'GNV' },
               ]} />
               <Seg value={field.value} onChange={field.onChange} options={[
-                { value: 'diesel',   label: 'Diesel' },
-                { value: 'flex',     label: 'Flex' },
+                { value: 'diesel', label: 'Diesel' },
+                { value: 'flex', label: 'Flex' },
                 { value: 'electric', label: 'Elétrico' },
               ]} />
             </div>
