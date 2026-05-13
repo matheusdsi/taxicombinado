@@ -250,8 +250,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     // Só o dono pode ver
     const isOwner =
       (req.userId && quote.userId === req.userId) ||
-      (!req.userId && quote.anonymousSession &&
-        (await prisma.anonymousSession.findUnique({ where: { id: quote.anonymousSessionId ?? '' } }))?.sessionId === req.anonymousId);
+      (!req.userId && quote.anonymousSessionId &&
+        (await prisma.anonymousSession.findUnique({ where: { id: quote.anonymousSessionId } }))?.sessionId === req.anonymousId);
 
     if (!isOwner) return res.status(403).json({ success: false, error: 'Sem acesso a esta cotação.' });
 

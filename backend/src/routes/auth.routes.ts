@@ -79,7 +79,7 @@ router.post('/driver/register', async (req: Request, res: Response) => {
     if (anonymousId) {
       await prisma.anonymousSession.updateMany({
         where: { sessionId: anonymousId },
-        data: { userId: user.id },
+        data: { userId: user.id } as any,
       }).catch(() => {});
       await prisma.quote.updateMany({
         where: {

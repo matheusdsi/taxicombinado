@@ -46,7 +46,7 @@ export async function anonymousIdMiddleware(
             sessionId: anonymousId,
             userAgent: req.headers['user-agent'],
             ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip,
-            userId: req.userId,
+            ...(req.userId ? { user: { connect: { id: req.userId } } } : {}),
           },
         })
         .catch(() => {});
