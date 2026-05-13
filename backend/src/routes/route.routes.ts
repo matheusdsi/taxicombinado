@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getMapProvider } from '../lib/maps';
 import { routeCalculateSchema } from '../schemas/quote.schema';
 import { ZodError } from 'zod';
+import { getFlags } from '../lib/featureFlags';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
         waypoints: input.waypoints,
       });
 
+      const { showRouteSteps } = getFlags();
       return res.json({
         success: true,
         data: {
@@ -25,6 +27,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
           durationMinutes: result.durationMinutes,
           polyline: result.polyline,
           provider: result.provider,
+          steps: showRouteSteps ? (result.steps ?? []) : [],
         },
       });
     }

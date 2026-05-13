@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { getQuoteHistory } from '@/lib/api';
-import { formatCurrencyBRL, formatDistance, formatDuration } from '@/lib/formatters';
+import { formatCurrencyBRL, formatDistance } from '@/lib/formatters';
 import { useAuth } from '@/context/AuthContext';
+import { getLocalQuotes, LocalQuote } from '@/lib/localQuotes';
 import Link from 'next/link';
 
 interface HistoryQuote {
@@ -18,6 +19,7 @@ interface HistoryQuote {
   totalCost: number;
   profit: number;
   margin: number;
+  isLocal?: boolean;
 }
 
 const tripTypeLabels: Record<string, string> = {
@@ -26,62 +28,69 @@ const tripTypeLabels: Record<string, string> = {
   empty_return: 'Volta vazia',
 };
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 export default function HistoricoPage() {
   const { driver } = useAuth();
   const [quotes, setQuotes] = useState<HistoryQuote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchHistory = async (p: number) => {
-    setLoading(true);
-    try {
-      const data = await getQuoteHistory({ page: p, limit: 15 });
-      setQuotes(data.quotes);
-      setTotalPages(data.totalPages);
-    } catch {
-      setError('Não foi possível carregar o histórico. Verifique sua conexão.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchHistory(page);
-  }, [page]);
-
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+    const load = async () => {
+      setLoading(true);
+      try {
+        // Tenta buscar do banco (funciona se logado ou com sessão anônima + DB online)
+        const data = await getQuoteHistory({ page, limit: 15 });
+        if (data.quotes.length > 0 || driver) {
+          setQuotes(data.quotes);
+          setTotalPages(data.totalPages);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // DB offline — cai no localStorage
+      }
+      // Fallback: localStorage
+      const local = getLocalQuotes();
+      const start = (page - 1) * 15;
+      setQuotes(local.slice(start, start + 15).map((q: LocalQuote) => ({ ...q, isLocal: true })));
+      setTotalPages(Math.ceil(local.length / 15) || 1);
+      setLoading(false);
+    };
+    load();
+  }, [page, driver]);
 
   return (
     <PageContainer>
-      <div className="mb-4 pt-2">
-        <h1 className="text-2xl font-black text-gray-900">Histórico</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {driver ? `Corridas salvas na sua conta` : 'Simulações deste aparelho'}
+      {/* Header */}
+      <div style={{ marginBottom: 16, paddingTop: 4 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Histórico</h1>
+        <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 4 }}>
+          {driver ? 'Corridas salvas na sua conta' : 'Simulações neste aparelho'}
         </p>
       </div>
 
-      {/* Banner CTA para quem não está logado */}
+      {/* Banner CTA não logado */}
       {!driver && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
-          <span className="text-2xl shrink-0">💡</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-yellow-900">Crie uma conta para salvar seu histórico</p>
-            <p className="text-xs text-yellow-700 mt-0.5">Agora só aparece neste aparelho. Com conta, você acessa de qualquer celular.</p>
-            <div className="flex gap-2 mt-2">
-              <Link href="/cadastro" className="text-xs bg-yellow-400 text-gray-900 font-bold px-3 py-1.5 rounded-lg hover:bg-yellow-500 transition-colors">
+        <div style={{ background: 'var(--yellow-soft)', border: '1px solid #FCEBA8', borderRadius: 16, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--yellow)', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 18 }}>💡</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)' }}>Salve seu histórico na nuvem</div>
+            <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 3 }}>
+              Agora só aparece neste aparelho. Com conta, acessa de qualquer celular — e suas cotações locais vão junto.
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <Link href="/cadastro" style={{ background: 'var(--ink)', color: '#fff', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 800, textDecoration: 'none' }}>
                 Criar conta grátis
               </Link>
-              <Link href="/entrar" className="text-xs text-yellow-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-yellow-100 transition-colors">
+              <Link href="/entrar" style={{ background: 'transparent', color: 'var(--gray-700)', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
                 Já tenho conta
               </Link>
             </div>
@@ -90,35 +99,20 @@ export default function HistoricoPage() {
       )}
 
       {loading && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="w-8 h-8 border-3 border-taxi-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Carregando histórico...</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid var(--gray-200)', borderTopColor: 'var(--ink)', animation: 'spin 0.9s linear infinite' }} />
+          <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>Carregando...</span>
         </div>
       )}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-          <p className="text-red-600 text-sm">{error}</p>
-          <button
-            onClick={() => fetchHistory(page)}
-            className="mt-2 text-red-600 font-medium text-sm underline"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && quotes.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <span className="text-6xl mb-4">🧾</span>
-          <h2 className="font-bold text-gray-700 text-lg">Nenhuma simulação ainda</h2>
-          <p className="text-gray-400 text-sm mt-1 mb-6">
+      {!loading && quotes.length === 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 52, marginBottom: 12 }}>🧾</div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--ink)' }}>Nenhuma simulação ainda</div>
+          <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 6, marginBottom: 20 }}>
             Suas corridas calculadas aparecem aqui
           </p>
-          <Link
-            href="/"
-            className="bg-taxi-500 text-white font-semibold px-6 py-3 rounded-xl hover:bg-taxi-600 transition-colors"
-          >
+          <Link href="/" style={{ background: 'var(--yellow)', color: 'var(--ink)', borderRadius: 14, padding: '14px 24px', fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>
             Calcular primeira corrida
           </Link>
         </div>
@@ -126,75 +120,65 @@ export default function HistoricoPage() {
 
       {!loading && quotes.length > 0 && (
         <>
-          <div className="flex flex-col gap-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {quotes.map((quote) => (
-              <div key={quote.id} className="bg-white rounded-2xl shadow-card p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
+              <div key={quote.id} className="tc-card" style={{ padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     {quote.originAddress || quote.destinationAddress ? (
-                      <p className="font-semibold text-gray-800 text-sm truncate">
-                        {quote.originAddress || '—'} → {quote.destinationAddress || '—'}
-                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 700, flexWrap: 'wrap' as const }}>
+                        <span style={{ color: 'var(--ink)' }}>{quote.originAddress || '—'}</span>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--gray-400)' }}><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        <span style={{ color: 'var(--ink)' }}>{quote.destinationAddress || '—'}</span>
+                      </div>
                     ) : (
-                      <p className="font-semibold text-gray-800 text-sm">
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>
                         {formatDistance(quote.distanceKm)} · {tripTypeLabels[quote.tripType] || quote.tripType}
-                      </p>
+                      </div>
                     )}
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(quote.createdAt)}</p>
+                    <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>{formatDate(quote.createdAt)}</div>
                   </div>
-                  <div className="text-right ml-3">
-                    <p className="text-lg font-black text-taxi-600">
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
                       {formatCurrencyBRL(quote.recommendedPrice)}
-                    </p>
-                    <p
-                      className={`text-xs font-medium ${
-                        quote.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: quote.profit >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 2 }}>
                       {quote.profit >= 0 ? '+' : ''}{formatCurrencyBRL(quote.profit)} lucro
-                    </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
-                  <span className="text-xs text-gray-400">
-                    {formatDistance(quote.distanceKm)}
-                  </span>
-                  <span className="text-gray-200">·</span>
-                  <span className="text-xs text-gray-400">
-                    Custo: {formatCurrencyBRL(quote.totalCost)}
-                  </span>
-                  <span className="text-gray-200">·</span>
-                  <span
-                    className={`text-xs font-medium ${
-                      quote.margin >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}
-                  >
+                <div style={{ height: 1, background: 'var(--gray-100)', margin: '10px 0' }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: 'var(--gray-500)' }}>
+                  <span>{formatDistance(quote.distanceKm)}</span>
+                  <span style={{ color: 'var(--gray-200)' }}>·</span>
+                  <span>Custo: {formatCurrencyBRL(quote.totalCost)}</span>
+                  <span style={{ color: 'var(--gray-200)' }}>·</span>
+                  <span style={{ fontWeight: 700, color: quote.margin >= 0 ? 'var(--green)' : 'var(--red)' }}>
                     {quote.margin.toFixed(1)}% margem
                   </span>
+                  {quote.isLocal && (
+                    <>
+                      <span style={{ color: 'var(--gray-200)' }}>·</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gray-400)' }}>LOCAL</span>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-4">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 disabled:opacity-40"
-              >
-                Anterior
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 16 }}>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                style={{ padding: '10px 18px', borderRadius: 12, border: '1.5px solid var(--gray-200)', background: 'var(--surface)', color: 'var(--gray-700)', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: page === 1 ? 0.4 : 1 }}>
+                ← Anterior
               </button>
-              <span className="text-sm text-gray-500">
-                {page} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 disabled:opacity-40"
-              >
-                Próxima
+              <span style={{ fontSize: 13, color: 'var(--gray-500)', fontWeight: 600 }}>{page} / {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                style={{ padding: '10px 18px', borderRadius: 12, border: '1.5px solid var(--gray-200)', background: 'var(--surface)', color: 'var(--gray-700)', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: page === totalPages ? 0.4 : 1 }}>
+                Próxima →
               </button>
             </div>
           )}

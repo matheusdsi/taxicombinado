@@ -6,19 +6,27 @@ import { getPartners, trackPartnerClick, Partner } from '@/lib/api';
 
 const categories = [
   { value: '', label: 'Todos' },
-  { value: 'fuel_station', label: 'Posto' },
-  { value: 'mechanic', label: 'Mecânica' },
-  { value: 'car_wash', label: 'Lava-rápido' },
+  { value: 'fuel_station', label: 'Postos' },
+  { value: 'mechanic', label: 'Oficina' },
+  { value: 'car_wash', label: 'Lavagem' },
   { value: 'toll_tag', label: 'Tag Pedágio' },
-  { value: 'vehicle_protection', label: 'Proteção' },
+  { value: 'vehicle_protection', label: 'Seguro' },
 ];
 
 const categoryLabels: Record<string, string> = {
-  fuel_station: '⛽ Posto',
-  mechanic: '🔧 Mecânica',
-  car_wash: '🚿 Lava-rápido',
-  toll_tag: '🛣️ Tag Pedágio',
-  vehicle_protection: '🛡️ Proteção Veicular',
+  fuel_station: 'Postos',
+  mechanic: 'Oficina',
+  car_wash: 'Lavagem',
+  toll_tag: 'Tag Pedágio',
+  vehicle_protection: 'Proteção Veicular',
+};
+
+const categoryInitials: Record<string, string> = {
+  fuel_station: 'PT',
+  mechanic: 'OF',
+  car_wash: 'LV',
+  toll_tag: 'TP',
+  vehicle_protection: 'SG',
 };
 
 export default function ParceirosPage() {
@@ -50,22 +58,26 @@ export default function ParceirosPage() {
 
   return (
     <PageContainer>
-      <div className="mb-4 pt-2">
-        <h1 className="text-2xl font-black text-gray-900">Parceiros</h1>
-        <p className="text-gray-500 text-sm mt-1">Serviços com vantagens para taxistas</p>
+      {/* Header */}
+      <div style={{ marginBottom: 16, paddingTop: 4 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Benefícios</h1>
+        <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 4 }}>Economize em combustível, pneus, manutenção e serviços.</p>
       </div>
 
-      {/* Category filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+      {/* Category chips */}
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, marginBottom: 4, scrollbarWidth: 'none' as const }}>
         {categories.map((cat) => (
           <button
             key={cat.value}
             onClick={() => setSelectedCategory(cat.value)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-              selectedCategory === cat.value
-                ? 'bg-taxi-500 text-white border-taxi-500'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-taxi-300'
-            }`}
+            style={{
+              flexShrink: 0, padding: '8px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+              border: '1px solid',
+              borderColor: selectedCategory === cat.value ? 'transparent' : 'var(--gray-200)',
+              background: selectedCategory === cat.value ? 'var(--ink)' : 'var(--surface)',
+              color: selectedCategory === cat.value ? '#fff' : 'var(--gray-700)',
+              cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s',
+            }}
           >
             {cat.label}
           </button>
@@ -73,70 +85,69 @@ export default function ParceirosPage() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-taxi-500 border-t-transparent rounded-full animate-spin" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '4px solid var(--gray-200)', borderTopColor: 'var(--ink)', animation: 'spin 0.9s linear infinite' }} />
         </div>
       )}
 
       {!loading && partners.length === 0 && (
-        <div className="text-center py-16">
-          <span className="text-5xl mb-4 block">🤝</span>
-          <p className="text-gray-500">Nenhum parceiro nessa categoria ainda.</p>
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🤝</div>
+          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>Nenhum parceiro nessa categoria ainda.</p>
         </div>
       )}
 
       {!loading && partners.length > 0 && (
-        <div className="flex flex-col gap-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {partners.map((partner) => (
             <div
               key={partner.id}
-              className={`bg-white rounded-2xl shadow-card overflow-hidden ${
-                partner.isPremium ? 'border-2 border-taxi-200' : ''
-              }`}
+              className="tc-card"
+              style={{
+                display: 'flex', gap: 12,
+                ...(partner.isPremium ? { background: 'linear-gradient(180deg, #FFFBEC, #fff)', borderColor: '#FCEBA8' } : {}),
+              }}
             >
-              {partner.isPremium && (
-                <div className="bg-taxi-500 text-white text-xs font-semibold px-3 py-1 text-center">
-                  ⭐ Parceiro Premium
-                </div>
-              )}
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-base">{partner.name}</h3>
-                    <span className="text-xs text-taxi-600 font-medium">
-                      {categoryLabels[partner.category] || partner.category}
-                    </span>
-                    {partner.city && (
-                      <span className="text-xs text-gray-400 ml-2">📍 {partner.city}</span>
-                    )}
-                  </div>
-                </div>
+              {/* Thumb */}
+              <div style={{
+                width: 56, height: 56, flexShrink: 0, borderRadius: 14,
+                background: partner.isPremium ? 'var(--yellow)' : 'var(--gray-100)',
+                color: partner.isPremium ? 'var(--ink)' : 'var(--gray-700)',
+                display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 14,
+              }}>
+                {categoryInitials[partner.category] || partner.name.slice(0, 2).toUpperCase()}
+              </div>
 
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{partner.name}</div>
+                  {partner.isPremium && (
+                    <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.08em', background: 'var(--ink)', color: 'var(--yellow)', padding: '2px 6px', borderRadius: 4 }}>DESTAQUE</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--gray-500)', marginBottom: 6 }}>
+                  {categoryLabels[partner.category] || partner.category}
+                  {partner.city && ` · ${partner.city}`}
+                </div>
                 {partner.description && (
-                  <p className="text-sm text-gray-600 mb-3 leading-relaxed">{partner.description}</p>
+                  <p style={{ fontSize: 13, color: 'var(--gray-700)', fontWeight: 600, marginBottom: 10, lineHeight: 1.4 }}>{partner.description}</p>
                 )}
-
-                <div className="flex gap-2">
+                <div style={{ display: 'flex', gap: 8 }}>
                   {partner.phone && (
                     <a
                       href={`tel:${partner.phone}`}
-                      className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 text-gray-700 font-medium py-2 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1.5px solid var(--gray-200)', background: 'var(--surface)', color: 'var(--ink)', borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                       Ligar
                     </a>
                   )}
                   {partner.websiteUrl && (
                     <button
                       onClick={() => handlePartnerClick(partner)}
-                      className="flex-1 flex items-center justify-center gap-1.5 bg-taxi-500 text-white font-medium py-2 rounded-xl text-sm hover:bg-taxi-600 transition-colors"
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      Ver site
+                      Ver oferta
                     </button>
                   )}
                 </div>
@@ -146,16 +157,18 @@ export default function ParceirosPage() {
         </div>
       )}
 
-      {/* CTA to become partner */}
-      <div className="mt-6 bg-gradient-to-br from-taxi-50 to-taxi-100 rounded-2xl p-4 border border-taxi-200">
-        <h3 className="font-bold text-gray-800 mb-1">Seu negócio aqui?</h3>
-        <p className="text-sm text-gray-600 mb-3">
-          Alcance taxistas de São Paulo com seu produto ou serviço.
+      {/* CTA anuncie */}
+      <div style={{ marginTop: 20, background: 'var(--yellow)', borderRadius: 22, padding: '20px 18px 22px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', right: -20, top: -30, width: 150, height: 150, borderRadius: '50%', background: 'rgba(17,24,39,.08)' }} />
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' as const, color: 'rgba(17,24,39,.6)', marginBottom: 8 }}>Para empresas</div>
+        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1, maxWidth: 260, marginBottom: 8 }}>
+          Anuncie para taxistas da sua região.
+        </div>
+        <p style={{ fontSize: 13, color: 'rgba(17,24,39,.7)', maxWidth: 260, marginBottom: 14 }}>
+          Sua oficina, posto ou seguro na frente de quem roda todo dia.
         </p>
-        <a
-          href="/anuncie"
-          className="inline-flex items-center gap-2 bg-taxi-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-taxi-600 transition-colors"
-        >
+        <a href="/anuncie"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--ink)', color: '#fff', borderRadius: 12, padding: '12px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
           Anuncie aqui →
         </a>
       </div>

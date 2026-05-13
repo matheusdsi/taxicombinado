@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { api, syncLocalQuotes } from '@/lib/api';
+import { getUnsyncedLocalQuotes, markLocalQuotesSynced } from '@/lib/localQuotes';
 
 interface Driver {
   id: string;
@@ -32,12 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/driver/me`, { credentials: 'include' });
-      if (res.ok) {
-        const { data } = await res.json();
-        setDriver(data);
-      } else {
-        setDriver(null);
+      const res = await api.get('/api/auth/driver/me');
+      setDriver(res.data.data);
+      // Sync any local quotes accumulated before login
+      const unsynced = getUnsyncedLocalQuotes();
+      if (unsynced.length > 0) {
+        syncLocalQuotes(unsynced).then(() => markLocalQuotesSynced()).catch(() => {});
       }
     } catch {
       setDriver(null);
@@ -47,7 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch(`${API_URL}/api/auth/driver/logout`, { method: 'POST', credentials: 'include' });
+    try {
+      await api.post('/api/auth/driver/logout');
+    } catch {
+      // ignore
+    }
     setDriver(null);
   }, []);
 

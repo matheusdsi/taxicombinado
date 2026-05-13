@@ -1,4 +1,4 @@
-import { MapProvider, RouteRequest, RouteResult } from './types';
+import { MapProvider, RouteRequest, RouteResult, RouteStep } from './types';
 
 export class GoogleMapsProvider implements MapProvider {
   private apiKey: string;
@@ -33,6 +33,11 @@ export class GoogleMapsProvider implements MapProvider {
         legs: Array<{
           distance: { value: number };
           duration: { value: number };
+          steps: Array<{
+            html_instructions: string;
+            distance: { value: number };
+            duration: { value: number };
+          }>;
         }>;
         overview_polyline: { points: string };
       }>;
@@ -45,11 +50,18 @@ export class GoogleMapsProvider implements MapProvider {
     const route = data.routes[0];
     const leg = route.legs[0];
 
+    const steps: RouteStep[] = leg.steps.map((s) => ({
+      instruction: s.html_instructions.replace(/<[^>]+>/g, ''),
+      distanceKm: s.distance.value / 1000,
+      durationMinutes: s.duration.value / 60,
+    }));
+
     return {
       distanceKm: leg.distance.value / 1000,
       durationMinutes: leg.duration.value / 60,
       polyline: route.overview_polyline.points,
       provider: 'google',
+      steps,
     };
   }
 }

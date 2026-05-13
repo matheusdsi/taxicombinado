@@ -13,11 +13,12 @@ interface AddressInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   hint?: string;
+  prefix?: React.ReactNode;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export function AddressInput({ label, value, onChange, placeholder, hint }: AddressInputProps) {
+export function AddressInput({ label, value, onChange, placeholder, hint, prefix }: AddressInputProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -75,13 +76,15 @@ export function AddressInput({ label, value, onChange, placeholder, hint }: Addr
       <div className={`flex items-center border rounded-xl px-3 py-2.5 bg-white transition-all ${
         open ? 'border-taxi-500 ring-2 ring-taxi-100' : 'border-gray-200'
       }`}>
+        {prefix && <span className="shrink-0 mr-2">{prefix}</span>}
         <input
           type="text"
           value={value}
           onChange={handleChange}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
           placeholder={placeholder ?? 'Digite o endereço...'}
-          className="flex-1 outline-none bg-transparent text-gray-900 text-base placeholder-gray-300"
+          className="flex-1 outline-none bg-transparent text-gray-900 text-base placeholder-gray-300 min-w-0"
+          style={{ width: 0 }}
         />
         {loading && (
           <div className="w-4 h-4 border-2 border-taxi-400 border-t-transparent rounded-full animate-spin shrink-0 ml-2" />

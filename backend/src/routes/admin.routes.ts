@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { getFlags, setFlag } from '../lib/featureFlags';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
@@ -329,6 +330,20 @@ router.get('/stats', async (_req: Request, res: Response) => {
     console.error('Admin stats error:', error);
     return res.status(500).json({ success: false, error: 'Erro ao buscar estatísticas' });
   }
+});
+
+// ─── GET /api/admin/settings ──────────────────────────────────
+router.get('/settings', (_req: Request, res: Response) => {
+  return res.json({ success: true, data: getFlags() });
+});
+
+// ─── POST /api/admin/settings ─────────────────────────────────
+router.post('/settings', (req: Request, res: Response) => {
+  const { showRouteSteps } = req.body as { showRouteSteps?: boolean };
+  if (typeof showRouteSteps === 'boolean') {
+    setFlag('showRouteSteps', showRouteSteps);
+  }
+  return res.json({ success: true, data: getFlags() });
 });
 
 function round2(n: number | null | undefined): number | null {

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { LegalFooter } from '@/components/layout/LegalFooter';
 import { ConsentBanner } from '@/components/ui/ConsentBanner';
 import { AuthProvider } from '@/context/AuthContext';
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <Header />
           <div className="min-h-[calc(100vh-56px)]">{children}</div>
+          <LegalFooter />
           <BottomNavigation />
           <ConsentBanner />
         </AuthProvider>

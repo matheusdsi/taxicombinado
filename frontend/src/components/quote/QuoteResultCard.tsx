@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { QuoteResult } from '@/lib/api';
+import { QuoteResult, RouteStep } from '@/lib/api';
 import { formatCurrencyBRL, formatDistance, generateWhatsAppText } from '@/lib/formatters';
 
 interface QuoteResultCardProps {
@@ -9,41 +9,43 @@ interface QuoteResultCardProps {
   quoteId: string;
   originAddress?: string;
   destinationAddress?: string;
+  routeSteps?: RouteStep[];
   onNewQuote: () => void;
 }
 
-const alertIcons: Record<string, string> = {
-  negative_profit:           '🔴',
-  custom_price_below_minimum:'🔴',
-  low_profit:                '🟡',
-  toll_missing:              '🟡',
-  high_margin:               '🟡',
-  empty_return_enabled:      '🔵',
-  check_route:               '🟡',
+const alertConfig: Record<string, { bg: string; color: string; iconBg: string }> = {
+  error:   { bg: 'var(--red-soft)',    color: '#7F1D1D', iconBg: 'var(--red)' },
+  warning: { bg: 'var(--orange-soft)', color: '#7C2D12', iconBg: 'var(--orange)' },
+  info:    { bg: 'var(--blue-soft)',   color: '#1E3A8A', iconBg: 'var(--blue)' },
 };
 
-const alertBg: Record<string, string> = {
-  error:   'bg-red-50 border-red-200 text-red-700',
-  warning: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-  info:    'bg-blue-50 border-blue-200 text-blue-700',
-};
+function splitMoney(n: number) {
+  const s = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const [int, dec] = s.split(',');
+  return { int, dec };
+}
 
-function CostRow({ label, value, highlight = false }: { label: string; value: number; highlight?: boolean }) {
+function CostRow({ label, value, bold = false }: { label: string; value: number; bold?: boolean }) {
   return (
-    <div className={`flex justify-between items-center py-1.5 ${highlight ? 'font-semibold' : 'text-gray-600'}`}>
-      <span className="text-sm">{label}</span>
-      <span className={`text-sm ${highlight ? 'font-bold text-gray-900' : ''}`}>{formatCurrencyBRL(value)}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14 }}>
+      <span style={{ color: bold ? 'var(--ink)' : 'var(--gray-700)', fontWeight: bold ? 800 : 600 }}>{label}</span>
+      <span style={{ fontWeight: bold ? 800 : 700, color: bold ? 'var(--ink)' : 'var(--gray-700)' }}>{formatCurrencyBRL(value)}</span>
     </div>
   );
 }
 
-export function QuoteResultCard({ result, quoteId, originAddress, destinationAddress, onNewQuote }: QuoteResultCardProps) {
+export function QuoteResultCard({ result, quoteId, originAddress, destinationAddress, routeSteps = [], onNewQuote }: QuoteResultCardProps) {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showSteps, setShowSteps] = useState(false);
 
   const profitRecommended = result.recommendedPrice - result.totalCost;
   const profitIdeal = result.idealPrice - result.totalCost;
   const marginIdeal = result.idealPrice > 0 ? (profitIdeal / result.idealPrice) * 100 : 0;
+  const lucroPositivo = profitRecommended > 0;
+  const rec = splitMoney(result.recommendedPrice);
+
+  const tripLabel = result.tripType === 'one_way' ? 'Só ida' : result.tripType === 'round_trip' ? 'Ida e volta' : 'Volta vazia';
 
   const copyText = () => {
     const lines = [
@@ -79,165 +81,240 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* ─── Rota ─── */}
-      {(originAddress || destinationAddress) && (
-        <div className="bg-white rounded-2xl shadow-card px-4 py-3 flex items-center gap-2 text-sm text-gray-600">
-          <span className="shrink-0">📍</span>
-          <span className="truncate">{originAddress || '—'}</span>
-          <span className="text-gray-300 shrink-0">→</span>
-          <span className="truncate">{destinationAddress || '—'}</span>
+      {/* ─── Hero amarelo ─── */}
+      <div className="tc-hero-yellow">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(17,24,39,.7)' }}>Preço recomendado</span>
+          <span style={{ background: 'rgba(17,24,39,.1)', color: 'var(--ink)', padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>
+            Margem {Math.round(result.margin)}%
+          </span>
         </div>
-      )}
-
-      {/* ─── Custo total (topo discreto) ─── */}
-      <div className="bg-white rounded-2xl shadow-card px-4 py-3 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-gray-400 font-medium">Custo real da corrida</p>
-          <p className="text-lg font-black text-gray-800">{formatCurrencyBRL(result.totalCost)}</p>
+        <div className="tc-money-xl">
+          R$ {rec.int}<span className="cents">,{rec.dec}</span>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-400">Distância</p>
-          <p className="text-sm font-semibold text-gray-600">{formatDistance(result.totalDistanceKm)}</p>
-        </div>
-      </div>
-
-      {/* ─── 3 preços em destaque ─── */}
-      <div className="flex flex-col gap-2">
-
-        {/* Mínimo aceitável */}
-        <div className="bg-white rounded-2xl shadow-card p-4 flex items-center justify-between border-l-4 border-gray-300">
-          <div>
-            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Mínimo aceitável</p>
-            <p className="text-sm text-gray-500 mt-0.5">Só cobre os custos</p>
-          </div>
-          <p className="text-2xl font-black text-gray-600">{formatCurrencyBRL(result.minimumPrice)}</p>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(17,24,39,.65)', marginTop: 6 }}>
+          Com base nos custos informados e margem desejada.
         </div>
 
-        {/* Recomendado — destaque */}
-        <div className="bg-gradient-to-br from-taxi-500 to-taxi-600 rounded-2xl p-5 shadow-result text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-taxi-100 text-xs font-semibold uppercase tracking-wide">Preço recomendado</p>
-              <p className="text-5xl font-black tracking-tight mt-1 leading-none">
-                {formatCurrencyBRL(result.recommendedPrice)}
-              </p>
-              <p className="text-taxi-100 text-xs mt-2">
-                Lucro: <span className="font-bold text-white">{formatCurrencyBRL(profitRecommended)}</span>
-                {' '}·{' '}
-                Margem: <span className="font-bold text-white">{result.margin.toFixed(0)}%</span>
-              </p>
-            </div>
-            <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full shrink-0 mt-1">
-              #{quoteId.slice(0, 6)}
-            </span>
-          </div>
-        </div>
-
-        {/* Lucro alto */}
-        <div className="bg-white rounded-2xl shadow-card p-4 flex items-center justify-between border-l-4 border-green-400">
-          <div>
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Lucro alto</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Lucro {formatCurrencyBRL(profitIdeal)} · {marginIdeal.toFixed(0)}% margem
-            </p>
-          </div>
-          <p className="text-2xl font-black text-green-600">{formatCurrencyBRL(result.idealPrice)}</p>
-        </div>
-      </div>
-
-      {/* Valor informado pelo taxista */}
-      {result.customChargedPrice && result.customChargedPrice > 0 && (
-        <div className={`rounded-2xl p-4 border flex items-center justify-between ${
-          result.customChargedPrice < result.minimumPrice
-            ? 'bg-red-50 border-red-200'
-            : 'bg-gray-50 border-gray-200'
-        }`}>
-          <div>
-            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Valor que você quer cobrar</p>
-            <p className={`text-sm mt-0.5 ${result.customChargedPrice < result.minimumPrice ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-              {result.customChargedPrice < result.minimumPrice
-                ? '⚠️ Abaixo do mínimo — pode dar prejuízo'
-                : `Lucro: ${formatCurrencyBRL(result.customChargedPrice - result.totalCost)}`}
-            </p>
-          </div>
-          <p className={`text-2xl font-black ${result.customChargedPrice < result.minimumPrice ? 'text-red-600' : 'text-gray-700'}`}>
-            {formatCurrencyBRL(result.customChargedPrice)}
-          </p>
-        </div>
-      )}
-
-      {/* ─── Alertas ─── */}
-      {result.alerts.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {result.alerts.map((alert, i) => (
-            <div key={i} className={`flex items-start gap-2 p-3 rounded-xl border text-sm ${alertBg[alert.severity]}`}>
-              <span className="mt-0.5 flex-shrink-0">{alertIcons[alert.type] ?? '⚠️'}</span>
-              <span>{alert.message}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
+          {[
+            { lab: 'CUSTO',  val: formatCurrencyBRL(result.totalCost),    color: undefined },
+            { lab: 'LUCRO',  val: formatCurrencyBRL(profitRecommended),   color: lucroPositivo ? '#0F5132' : '#7F1D1D' },
+            { lab: 'POR KM', val: formatCurrencyBRL(result.recommendedPrice / Math.max(1, result.totalDistanceKm)), color: undefined },
+          ].map((it) => (
+            <div key={it.lab} style={{ background: 'rgba(17,24,39,.09)', padding: '10px 8px', borderRadius: 12 }}>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', color: 'rgba(17,24,39,.6)' }}>{it.lab}</div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginTop: 3, color: it.color }}>{it.val}</div>
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ─── Ações rápidas ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <button type="button" onClick={shareWhatsApp}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 14, padding: '14px 16px', fontFamily: 'inherit', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M12 2a10 10 0 0 0-8.6 15.07L2 22l5.07-1.32A10 10 0 1 0 12 2Zm5.27 14.27c-.22.62-1.27 1.17-1.78 1.22-.46.05-1.05.07-1.69-.1a13 13 0 0 1-1.83-.68 11.36 11.36 0 0 1-4.32-3.83c-.34-.5-1.18-1.58-1.18-3.02 0-1.43.74-2.13 1-2.43.27-.3.58-.37.78-.37l.56.01c.18 0 .42-.07.66.5l.93 2.27c.08.16.13.34.02.55l-.32.5c-.1.16-.22.34-.05.65.17.3.75 1.22 1.61 1.97 1.1.96 2.04 1.27 2.36 1.42.32.15.5.13.69-.08.18-.2.79-.92.99-1.24.2-.32.4-.27.68-.16.27.1 1.74.82 2.04.97.3.15.5.22.57.34.07.13.07.75-.16 1.37Z"/>
+          </svg>
+          WhatsApp
+        </button>
+        <button type="button" onClick={copyText}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--surface)', color: 'var(--ink)', border: '1.5px solid var(--gray-200)', borderRadius: 14, padding: '14px 16px', fontFamily: 'inherit', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+          {copied ? (
+            <>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+              Copiado!
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+              Copiar
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* ─── Alertas ─── */}
+      {result.alerts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {result.alerts.map((alert, i) => {
+            const cfg = alertConfig[alert.severity] ?? alertConfig.info;
+            return (
+              <div key={i} style={{ background: cfg.bg, color: cfg.color, borderRadius: 14, padding: '11px 13px', fontSize: 13, fontWeight: 600, lineHeight: 1.35, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ width: 20, height: 20, borderRadius: 6, background: cfg.iconBg, color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                </div>
+                {alert.message}
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* ─── Detalhamento colapsável ─── */}
-      <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+      {/* ─── Resumo da rota ─── */}
+      {(originAddress || destinationAddress) && (
+        <div className="tc-card">
+          <div className="tc-section-title">Resumo da rota</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 2 }}>
+              <span className="pin-a">A</span>
+              <span style={{ width: 1.5, flex: 1, background: 'var(--gray-200)', margin: '4px 0', minHeight: 24, display: 'block' }}/>
+              <span className="pin-b">B</span>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{originAddress || '—'}</div>
+              <div style={{ fontSize: 12, color: 'var(--gray-500)', margin: '4px 0 16px' }}>Saída</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{destinationAddress || '—'}</div>
+              <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>Destino</div>
+            </div>
+          </div>
+          <div style={{ height: 1, background: 'var(--gray-200)', margin: '14px 0' }}/>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
+            {[
+              { lab: 'Distância', val: formatDistance(result.totalDistanceKm) },
+              { lab: 'Tipo',      val: tripLabel },
+              { lab: 'ID',        val: quoteId.startsWith('local-') ? 'LOCAL' : `#${quoteId.slice(0, 6)}` },
+            ].map((it) => (
+              <div key={it.lab}>
+                <div style={{ fontSize: 10, color: 'var(--gray-500)', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.04em' }}>{it.lab}</div>
+                <div style={{ fontWeight: 800, fontSize: 14, marginTop: 3 }}>{it.val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Faixas de preço ─── */}
+      <div className="tc-card">
+        <div className="tc-section-title">Faixas de preço</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {[
+            { lab: 'Mínimo (não sai no prejuízo)',      val: result.minimumPrice,     color: 'var(--gray-500)', highlight: false },
+            { lab: 'Pela tarifa de táxi do município',  val: result.farePrice,        color: 'var(--gray-700)', highlight: false },
+            { lab: 'Recomendado',                       val: result.recommendedPrice, color: 'var(--ink)',      highlight: true },
+            { lab: 'Ideal (margem + reserva)',           val: result.idealPrice,       color: 'var(--green)',    highlight: false },
+          ].map((p) => (
+            <div key={p.lab} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: p.highlight ? '10px 12px' : '7px 4px',
+              background: p.highlight ? 'var(--yellow-soft)' : 'transparent',
+              borderRadius: p.highlight ? 10 : 0,
+            }}>
+              <span style={{ fontSize: 13, color: p.color, fontWeight: p.highlight ? 800 : 600 }}>{p.lab}</span>
+              <span style={{ fontWeight: 800, fontSize: 15, color: p.color }}>{formatCurrencyBRL(p.val)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Detalhamento de custos ─── */}
+      <div className="tc-card" style={{ padding: 0, overflow: 'hidden' }}>
         <button type="button" onClick={() => setShowDetails(!showDetails)}
-          className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors">
-          <span className="text-sm font-semibold">Ver detalhamento de custos</span>
-          <svg className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: 0, background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' as const }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Detalhamento de custos</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transform: showDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--gray-400)' }}>
+            <path d="M19 9l-7 7-7-7"/>
           </svg>
         </button>
-
         {showDetails && (
-          <div className="px-4 pb-4 border-t border-gray-100 divide-y divide-gray-50">
-            <div className="py-2">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Custos</p>
-              <CostRow label="Combustível" value={result.fuelCost} />
-              {result.tollTotal > 0 && <CostRow label="Pedágios" value={result.tollTotal} />}
-              {result.parkingCost > 0 && <CostRow label="Estacionamento" value={result.parkingCost} />}
-              {result.extraCosts > 0 && <CostRow label="Outras taxas" value={result.extraCosts} />}
-              <CostRow label="Total de custos" value={result.totalCost} highlight />
-            </div>
-            <div className="py-2">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Preços</p>
-              <CostRow label="Pelo taxímetro (tarifa)" value={result.farePrice} />
-              <CostRow label="Mínimo aceitável" value={result.minimumPrice} />
-              <CostRow label="Recomendado" value={result.recommendedPrice} highlight />
-              <CostRow label="Lucro alto" value={result.idealPrice} />
+          <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--gray-100)' }}>
+            <div style={{ paddingTop: 12 }}>
+              <CostRow label="Combustível"     value={result.fuelCost} />
+              {result.tollTotal > 0    && <CostRow label="Pedágios"         value={result.tollTotal} />}
+              {result.parkingCost > 0  && <CostRow label="Estacionamento"   value={result.parkingCost} />}
+              {result.extraCosts > 0   && <CostRow label="Outras taxas"     value={result.extraCosts} />}
+              <div style={{ height: 1, background: 'var(--gray-200)', margin: '8px 0' }}/>
+              <CostRow label="Total de custos" value={result.totalCost} bold />
             </div>
           </div>
         )}
       </div>
 
-      {/* ─── Botões ─── */}
-      <div className="flex gap-2">
-        <button type="button" onClick={copyText}
-          className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium py-3 rounded-xl text-sm hover:bg-gray-50 shadow-card transition-colors active:scale-[0.98]">
-          {copied ? (
-            <><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Copiado!</>
-          ) : (
-            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Copiar</>
+      {/* ─── Caminho sugerido ─── */}
+      {routeSteps.length > 0 && (
+        <div className="tc-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button type="button" onClick={() => setShowSteps(!showSteps)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: 0, background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' as const }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Caminho sugerido</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: showSteps ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--gray-400)', flexShrink: 0 }}>
+              <path d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          {showSteps && (
+            <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--gray-100)' }}>
+              {routeSteps.map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 12, paddingTop: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: i === 0 ? 'var(--ink)' : i === routeSteps.length - 1 ? 'var(--green)' : 'var(--gray-200)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: i === 0 || i === routeSteps.length - 1 ? '#fff' : 'var(--gray-500)' }}>{i + 1}</span>
+                    </div>
+                    {i < routeSteps.length - 1 && (
+                      <div style={{ width: 1.5, flex: 1, minHeight: 16, background: 'var(--gray-200)', margin: '3px 0' }} />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, paddingBottom: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.35 }}>{step.instruction}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 2 }}>
+                      {step.distanceKm >= 1 ? `${step.distanceKm.toFixed(1)} km` : `${Math.round(step.distanceKm * 1000)} m`}
+                      {' · '}
+                      {Math.round(step.durationMinutes)} min
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-        </button>
+        </div>
+      )}
 
-        <button type="button" onClick={shareWhatsApp}
-          className="flex-1 flex items-center justify-center gap-2 bg-green-500 text-white font-medium py-3 rounded-xl text-sm hover:bg-green-600 shadow-sm transition-colors active:scale-[0.98]">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-          </svg>
-          WhatsApp
-        </button>
+      {/* ─── Valor informado ─── */}
+      {result.customChargedPrice && result.customChargedPrice > 0 && (
+        <div style={{
+          background: result.customChargedPrice < result.minimumPrice ? 'var(--red-soft)' : 'var(--gray-50)',
+          border: `1px solid ${result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--gray-200)'}`,
+          borderRadius: 16, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray-500)', textTransform: 'uppercase' as const, letterSpacing: '.04em' }}>Valor que você quer cobrar</div>
+            <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, color: result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--gray-500)' }}>
+              {result.customChargedPrice < result.minimumPrice
+                ? 'Abaixo do mínimo — pode dar prejuízo'
+                : `Lucro: ${formatCurrencyBRL(result.customChargedPrice - result.totalCost)}`}
+            </div>
+          </div>
+          <div style={{ fontWeight: 800, fontSize: 22, color: result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--ink)' }}>
+            {formatCurrencyBRL(result.customChargedPrice)}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Card parceiro ─── */}
+      <div className="tc-card" style={{ background: 'linear-gradient(180deg, #FFFBEC, #FFF)', borderColor: '#FCEBA8' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--ink)', color: 'var(--yellow)', display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 18, flexShrink: 0 }}>%</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>Economize nos custos do carro</div>
+            <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 3 }}>Pneus, manutenção e combustível pesam para quem roda todo dia.</div>
+          </div>
+          <a href="/parceiros"
+            style={{ background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 12, padding: '10px 14px', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'none', flexShrink: 0 }}>
+            Ver
+          </a>
+        </div>
       </div>
 
+      {/* ─── Nova cotação ─── */}
       <button type="button" onClick={onNewQuote}
-        className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-medium py-3 rounded-xl text-sm hover:bg-gray-200 transition-colors active:scale-[0.98]">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--gray-100)', color: 'var(--gray-700)', border: 0, borderRadius: 14, padding: '14px 16px', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5M11 6l-6 6 6 6"/>
         </svg>
-        Nova simulação
+        Recalcular
       </button>
     </div>
   );

@@ -86,8 +86,9 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
               ? 'border-red-400'
               : 'border-gray-200'
           } ${disabled ? 'opacity-50 bg-gray-50' : ''}`}
+          style={{ minWidth: 0 }}
         >
-          <span className="text-gray-400 text-sm mr-1.5 font-medium">R$</span>
+          <span className="text-gray-400 text-sm mr-1.5 font-medium shrink-0">R$</span>
           <input
             ref={ref}
             type="text"
@@ -99,7 +100,8 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
             placeholder={placeholder}
             disabled={disabled}
             min={min}
-            className="flex-1 outline-none bg-transparent text-gray-900 text-base placeholder-gray-300"
+            className="flex-1 outline-none bg-transparent text-gray-900 text-base placeholder-gray-300 min-w-0"
+            style={{ width: 0 }}
           />
         </div>
         {hint && !error && <p className="text-xs text-gray-400">{hint}</p>}

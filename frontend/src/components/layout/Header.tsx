@@ -44,7 +44,7 @@ export function Header() {
               <div className="flex items-center gap-2">
                 <Link
                   href="/entrar"
-                  className="text-xs text-gray-500 hover:text-gray-800 transition-colors hidden sm:block"
+                  className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
                 >
                   Entrar
                 </Link>

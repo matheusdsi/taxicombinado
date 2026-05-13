@@ -28,6 +28,7 @@ api.interceptors.response.use(
     if (error.response?.status === 500) {
       console.error('Erro interno do servidor:', error.response.data);
     }
+    // 401 é esperado quando não há sessão — não loga no console
     return Promise.reject(error);
   }
 );
@@ -97,6 +98,31 @@ export async function calculateQuote(payload: CalculateQuotePayload): Promise<{
   result: QuoteResult;
 }> {
   const res = await api.post('/api/quote/calculate', payload);
+  return res.data.data;
+}
+
+export async function syncLocalQuotes(quotes: import('./localQuotes').LocalQuote[]): Promise<void> {
+  if (!quotes.length) return;
+  try {
+    await api.post('/api/quotes/sync', { quotes });
+  } catch {
+    // silently ignore — sync is best-effort
+  }
+}
+
+export interface RouteStep {
+  instruction: string;
+  distanceKm: number;
+  durationMinutes: number;
+}
+
+export async function calculateRoute(origin: string, destination: string): Promise<{
+  distanceKm: number | null;
+  durationMinutes: number | null;
+  provider: string;
+  steps: RouteStep[];
+}> {
+  const res = await api.post('/api/route/calculate', { origin, destination });
   return res.data.data;
 }
 

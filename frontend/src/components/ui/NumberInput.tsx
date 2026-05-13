@@ -26,8 +26,9 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
           className={`flex items-center border rounded-xl px-3 py-2.5 bg-white transition-all focus-within:border-taxi-500 focus-within:ring-2 focus-within:ring-taxi-100 ${
             error ? 'border-red-400' : 'border-gray-200'
           } ${disabled ? 'opacity-50 bg-gray-50' : ''}`}
+          style={{ minWidth: 0 }}
         >
-          {prefix && <span className="text-gray-400 text-sm mr-1.5">{prefix}</span>}
+          {prefix && <span className="text-gray-400 text-sm mr-1.5 shrink-0">{prefix}</span>}
           <input
             ref={ref}
             type="number"
@@ -41,10 +42,11 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
             min={min}
             max={max}
             step={step}
-            className="flex-1 outline-none bg-transparent text-gray-900 text-base w-full"
+            className="flex-1 outline-none bg-transparent text-gray-900 text-base min-w-0"
+            style={{ width: 0 }}
             {...rest}
           />
-          {suffix && <span className="text-gray-400 text-sm ml-1.5 whitespace-nowrap">{suffix}</span>}
+          {suffix && <span className="text-gray-400 text-sm ml-1.5 whitespace-nowrap shrink-0">{suffix}</span>}
         </div>
         {hint && !error && <p className="text-xs text-gray-400">{hint}</p>}
         {error && <p className="text-xs text-red-500">{error}</p>}

@@ -34,80 +34,156 @@ router.post('/calculate', async (req: Request, res: Response) => {
       customChargedPrice: input.customChargedPrice,
     });
 
-    // Resolve anonymous session id
-    const anonymousId = req.anonymousId;
-    let anonymousSessionId: string | null = null;
-    if (anonymousId) {
-      const session = await prisma.anonymousSession.findUnique({ where: { sessionId: anonymousId } });
-      if (session) anonymousSessionId = session.id;
+    // Try to persist — if DB is unavailable, still return the result
+    let quoteId = 'local-' + Date.now();
+    try {
+      const anonymousId = req.anonymousId;
+      let anonymousSessionId: string | null = null;
+      if (anonymousId) {
+        const session = await prisma.anonymousSession.findUnique({ where: { sessionId: anonymousId } });
+        if (session) anonymousSessionId = session.id;
+      }
+
+      const userId = req.userId ?? null;
+
+      const quote = await prisma.quote.create({
+        data: {
+          userId,
+          anonymousSessionId,
+          originAddress: input.originAddress,
+          destinationAddress: input.destinationAddress,
+          tripType: input.tripType,
+          routeMode: input.routeMode,
+          distanceKm: result.distanceKm,
+          returnDistanceKm: result.returnDistanceKm,
+          totalDistanceKm: result.totalDistanceKm,
+          estimatedMinutes: result.estimatedMinutes,
+          consumptionKmPerLiter: input.consumptionKmPerLiter,
+          fuelPricePerLiter: input.fuelPricePerLiter,
+          fuelType: input.fuelType,
+          vehicleExtraCostPerKm: input.vehicleExtraCostPerKm,
+          baseFare: input.baseFare,
+          pricePerKm: input.pricePerKm,
+          waitingPrice: input.waitingPrice,
+          waitingChargeType: input.waitingChargeType,
+          flagMultiplier: input.flagMultiplier,
+          tollOutbound: input.tollOutbound,
+          tollReturn: input.tollReturn,
+          parkingCost: input.parkingCost,
+          extraCosts: input.extraCosts,
+          desiredMarginPercent: input.desiredMarginPercent,
+          driverMinimumValue: input.driverMinimumValue,
+          customChargedPrice: input.customChargedPrice,
+          fuelCost: result.fuelCost,
+          vehicleExtraCost: result.vehicleExtraCost,
+          tollTotal: result.tollTotal,
+          totalCost: result.totalCost,
+          timeCharge: result.timeCharge,
+          farePrice: result.farePrice,
+          minimumPrice: result.minimumPrice,
+          recommendedPrice: result.recommendedPrice,
+          idealPrice: result.idealPrice,
+          profit: result.profit,
+          margin: result.margin,
+          alerts: result.alerts as object[],
+          stops: input.stops?.length
+            ? { create: input.stops.map((address, index) => ({ order: index, address })) }
+            : undefined,
+        },
+        include: { stops: true },
+      });
+
+      await prisma.quoteEvent.create({
+        data: {
+          quoteId: quote.id,
+          eventType: 'calculated',
+          metadata: { tripType: input.tripType, routeMode: input.routeMode },
+        },
+      });
+
+      quoteId = quote.id;
+    } catch (dbError) {
+      // DB unavailable — calculation still succeeds, just not persisted
+      console.warn('DB unavailable, quote not persisted:', dbError instanceof Error ? dbError.message : dbError);
     }
 
-    // userId vem do middleware (null se não logado)
-    const userId = req.userId ?? null;
-
-    const quote = await prisma.quote.create({
-      data: {
-        userId,
-        anonymousSessionId,
-        originAddress: input.originAddress,
-        destinationAddress: input.destinationAddress,
-        tripType: input.tripType,
-        routeMode: input.routeMode,
-        distanceKm: result.distanceKm,
-        returnDistanceKm: result.returnDistanceKm,
-        totalDistanceKm: result.totalDistanceKm,
-        estimatedMinutes: result.estimatedMinutes,
-        consumptionKmPerLiter: input.consumptionKmPerLiter,
-        fuelPricePerLiter: input.fuelPricePerLiter,
-        fuelType: input.fuelType,
-        vehicleExtraCostPerKm: input.vehicleExtraCostPerKm,
-        baseFare: input.baseFare,
-        pricePerKm: input.pricePerKm,
-        waitingPrice: input.waitingPrice,
-        waitingChargeType: input.waitingChargeType,
-        flagMultiplier: input.flagMultiplier,
-        tollOutbound: input.tollOutbound,
-        tollReturn: input.tollReturn,
-        parkingCost: input.parkingCost,
-        extraCosts: input.extraCosts,
-        desiredMarginPercent: input.desiredMarginPercent,
-        driverMinimumValue: input.driverMinimumValue,
-        customChargedPrice: input.customChargedPrice,
-        fuelCost: result.fuelCost,
-        vehicleExtraCost: result.vehicleExtraCost,
-        tollTotal: result.tollTotal,
-        totalCost: result.totalCost,
-        timeCharge: result.timeCharge,
-        farePrice: result.farePrice,
-        minimumPrice: result.minimumPrice,
-        recommendedPrice: result.recommendedPrice,
-        idealPrice: result.idealPrice,
-        profit: result.profit,
-        margin: result.margin,
-        alerts: result.alerts as object[],
-        stops: input.stops?.length
-          ? { create: input.stops.map((address, index) => ({ order: index, address })) }
-          : undefined,
-      },
-      include: { stops: true },
-    });
-
-    await prisma.quoteEvent.create({
-      data: {
-        quoteId: quote.id,
-        eventType: 'calculated',
-        metadata: { tripType: input.tripType, routeMode: input.routeMode },
-      },
-    });
-
-    return res.status(201).json({ success: true, data: { quoteId: quote.id, result } });
+    return res.status(201).json({ success: true, data: { quoteId, result } });
   } catch (error) {
     if (error instanceof ZodError) {
       return res.status(400).json({ success: false, error: 'Dados inválidos', details: error.errors });
     }
-    console.error('Error calculating quote:', error);
+    console.error('Error calculating quote:', error instanceof Error ? error.message : error);
     return res.status(500).json({ success: false, error: 'Erro interno ao calcular a corrida' });
   }
+});
+
+// POST /api/quotes/sync — bulk-import local quotes for the authenticated user
+router.post('/sync', async (req: Request, res: Response) => {
+  if (!req.userId) {
+    return res.status(401).json({ success: false, error: 'Autenticação necessária' });
+  }
+
+  const { quotes } = req.body as { quotes?: unknown[] };
+  if (!Array.isArray(quotes) || quotes.length === 0) {
+    return res.json({ success: true, data: { synced: 0 } });
+  }
+
+  let synced = 0;
+  for (const q of quotes as Record<string, unknown>[]) {
+    try {
+      if (!q.id || !q.createdAt) continue;
+      // Skip already-persisted server IDs (UUIDs), only sync local-* or short ids
+      const isLocalId = typeof q.id === 'string' && (q.id.startsWith('local-') || q.id.length < 20);
+      if (!isLocalId) continue;
+
+      await prisma.quote.create({
+        data: {
+          userId: req.userId,
+          originAddress: (q.originAddress as string) || null,
+          destinationAddress: (q.destinationAddress as string) || null,
+          tripType: (q.tripType as string) || 'one_way',
+          routeMode: 'manual',
+          distanceKm: Number(q.distanceKm) || 0,
+          returnDistanceKm: 0,
+          totalDistanceKm: Number(q.distanceKm) || 0,
+          estimatedMinutes: 0,
+          consumptionKmPerLiter: 0,
+          fuelPricePerLiter: 0,
+          fuelType: 'gasolina',
+          vehicleExtraCostPerKm: 0,
+          baseFare: 0,
+          pricePerKm: 0,
+          waitingPrice: 0,
+          waitingChargeType: 'per_minute',
+          flagMultiplier: 1,
+          tollOutbound: 0,
+          tollReturn: 0,
+          parkingCost: 0,
+          extraCosts: 0,
+          desiredMarginPercent: 0,
+          driverMinimumValue: 0,
+          fuelCost: 0,
+          vehicleExtraCost: 0,
+          tollTotal: 0,
+          totalCost: Number(q.totalCost) || 0,
+          timeCharge: 0,
+          farePrice: 0,
+          minimumPrice: 0,
+          recommendedPrice: Number(q.recommendedPrice) || 0,
+          idealPrice: 0,
+          profit: Number(q.profit) || 0,
+          margin: Number(q.margin) || 0,
+          alerts: [],
+          createdAt: new Date(q.createdAt as string),
+        },
+      });
+      synced++;
+    } catch {
+      // skip individual failures — best-effort
+    }
+  }
+
+  return res.json({ success: true, data: { synced } });
 });
 
 // GET /api/quotes/history
