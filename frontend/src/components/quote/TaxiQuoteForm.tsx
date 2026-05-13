@@ -148,10 +148,21 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   });
 
   const tripType = watch('tripType');
+  const returnDistanceKm = watch('returnDistanceKm');
   const fuelType = watch('fuelType');
   const desiredMarginPercent = watch('desiredMarginPercent');
   const flagMultiplier = watch('flagMultiplier');
   const isElectric = fuelType === 'electric';
+  const routeTotalDistanceKm = routeInfo
+    ? tripType === 'one_way'
+      ? routeInfo.distanceKm
+      : routeInfo.distanceKm + (returnDistanceKm || routeInfo.distanceKm)
+    : 0;
+  const routeTotalMinutes = routeInfo
+    ? tripType === 'round_trip'
+      ? routeInfo.durationMinutes * 2
+      : routeInfo.durationMinutes
+    : 0;
 
   const applyPreset = useCallback(
     (preset: 'comum' | 'luxo') => {
@@ -319,8 +330,13 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M5 12l5 5L20 7" /></svg>
               <div>
-                <span style={{ fontSize: 14, fontWeight: 800, color: '#14532D' }}>{routeInfo.distanceKm.toFixed(1)} km</span>
-                <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}> · {Math.round(routeInfo.durationMinutes)} min estimados</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#14532D' }}>{routeTotalDistanceKm.toFixed(1)} km</span>
+                <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}> · {Math.round(routeTotalMinutes)} min estimados</span>
+                {tripType !== 'one_way' && (
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--green)', fontWeight: 600, marginTop: 2 }}>
+                    Ida {routeInfo.distanceKm.toFixed(1)} km + volta {(returnDistanceKm || routeInfo.distanceKm).toFixed(1)} km
+                  </span>
+                )}
               </div>
             </div>
             <button type="button" onClick={() => setRouteInfo(null)}
