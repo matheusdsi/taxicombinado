@@ -208,7 +208,7 @@ router.get('/history', async (req: Request, res: Response) => {
     }
 
     // Anônimo → busca por anonymous session
-    const anonymousId = query.anonymousId || req.anonymousId;
+    const anonymousId = req.anonymousId;
     if (!anonymousId) return res.json({ success: true, data: { quotes: [], total: 0 } });
 
     const session = await prisma.anonymousSession.findUnique({ where: { sessionId: anonymousId } });

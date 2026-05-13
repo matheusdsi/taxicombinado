@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
@@ -12,8 +12,6 @@ export const metadata: Metadata = {
     'Calcule o preço justo da sua corrida de táxi considerando combustível, pedágios, tempo e margem de lucro. Feito para taxistas de São Paulo.',
   keywords: ['taxi', 'táxi', 'calculadora', 'corrida', 'taxista', 'São Paulo', 'preço', 'tarifa'],
   authors: [{ name: 'Taxi Combinado' }],
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
-  themeColor: '#f59e0b',
   manifest: '/manifest.json',
   openGraph: {
     title: 'Taxi Combinado - Calculadora de Corrida',
@@ -21,6 +19,13 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'pt_BR',
   },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#f59e0b',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

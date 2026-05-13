@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { requiredSecret } from '../lib/env';
 
 declare global {
   namespace Express {
@@ -16,7 +17,7 @@ const ANON_COOKIE = 'pct_anonymous_id';
 const DRIVER_COOKIE = 'pct_driver_session';
 const COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+const JWT_SECRET = requiredSecret('JWT_SECRET');
 const isProduction = process.env.NODE_ENV === 'production';
 
 export async function anonymousIdMiddleware(

@@ -3,9 +3,10 @@ import jwt from 'jsonwebtoken';
 import { z, ZodError } from 'zod';
 import { prisma } from '../lib/prisma';
 import { getFlags, setFlag } from '../lib/featureFlags';
+import { requiredSecret } from '../lib/env';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+const JWT_SECRET = requiredSecret('JWT_SECRET');
 const COOKIE_NAME = 'pct_admin_session';
 
 // ─── Auth middleware ──────────────────────────────────────────

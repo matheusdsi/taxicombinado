@@ -17,7 +17,9 @@ function buildProxyHeaders(request: NextRequest) {
   return headers;
 }
 
-async function proxy(request: NextRequest, pathParts: string[]) {
+type RouteContext = { params: Promise<{ path: string[] }> };
+
+async function proxy(request: NextRequest, context: RouteContext) {
   if (!API_URL) {
     return NextResponse.json(
       { success: false, error: 'API_URL nao configurada no frontend.' },
@@ -25,6 +27,7 @@ async function proxy(request: NextRequest, pathParts: string[]) {
     );
   }
 
+  const { path: pathParts } = await context.params;
   const path = pathParts.join('/');
   const search = request.nextUrl.search;
   const targetUrl = `${API_URL}/api/${path}${search}`;
@@ -48,22 +51,22 @@ async function proxy(request: NextRequest, pathParts: string[]) {
   });
 }
 
-export async function GET(request: NextRequest, context: { params: { path: string[] } }) {
-  return proxy(request, context.params.path);
+export async function GET(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
 }
 
-export async function POST(request: NextRequest, context: { params: { path: string[] } }) {
-  return proxy(request, context.params.path);
+export async function POST(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
 }
 
-export async function PUT(request: NextRequest, context: { params: { path: string[] } }) {
-  return proxy(request, context.params.path);
+export async function PUT(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
 }
 
-export async function PATCH(request: NextRequest, context: { params: { path: string[] } }) {
-  return proxy(request, context.params.path);
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
 }
 
-export async function DELETE(request: NextRequest, context: { params: { path: string[] } }) {
-  return proxy(request, context.params.path);
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
 }

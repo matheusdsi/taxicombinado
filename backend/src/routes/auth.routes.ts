@@ -3,10 +3,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z, ZodError } from 'zod';
 import { prisma } from '../lib/prisma';
+import { requiredSecret } from '../lib/env';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
+const JWT_SECRET = requiredSecret('JWT_SECRET');
+const ADMIN_SECRET = requiredSecret('ADMIN_SECRET');
 const ADMIN_COOKIE = 'pct_admin_session';
 const DRIVER_COOKIE = 'pct_driver_session';
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 dias
@@ -185,8 +187,7 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const input = adminRegisterSchema.parse(req.body);
 
-    const expectedSecret = process.env.ADMIN_SECRET;
-    if (!expectedSecret || input.adminSecret !== expectedSecret) {
+    if (input.adminSecret !== ADMIN_SECRET) {
       return res.status(403).json({ success: false, error: 'Código de cadastro inválido.' });
     }
 
