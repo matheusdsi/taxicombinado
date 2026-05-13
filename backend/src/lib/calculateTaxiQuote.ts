@@ -147,8 +147,11 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     timeCharge = estimatedMinutes * waitingPrice;
   }
 
-  // Fare price = (baseFare + distance * pricePerKm + time charge) * flagMultiplier
-  const farePrice = (baseFare + distanceKm * pricePerKm + timeCharge) * flagMultiplier;
+  const chargeableDistanceKm = tripType === 'round_trip' ? effectiveTotalDistance : distanceKm;
+
+  // Fare price = (baseFare + chargeable distance * pricePerKm + time charge) * flagMultiplier.
+  // Round trips charge both legs; empty returns only add the return leg to costs.
+  const farePrice = (baseFare + chargeableDistanceKm * pricePerKm + timeCharge) * flagMultiplier;
 
   // ─── Pricing Strategy ─────────────────────────────────────────
 

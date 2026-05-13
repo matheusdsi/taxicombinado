@@ -177,9 +177,15 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     setLoading(true);
     setApiError(null);
     try {
+      const estimatedMinutes = routeInfo?.durationMinutes
+        ? data.tripType === 'round_trip'
+          ? routeInfo.durationMinutes * 2
+          : routeInfo.durationMinutes
+        : 0;
+
       const response = await calculateQuote({
         ...data,
-        estimatedMinutes: 0,
+        estimatedMinutes,
         vehicleExtraCostPerKm: 0,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
