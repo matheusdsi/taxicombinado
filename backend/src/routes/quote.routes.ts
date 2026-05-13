@@ -1,0 +1,189 @@
+import { Router, Request, Response } from 'express';
+import { calculateTaxiQuote } from '../lib/calculateTaxiQuote';
+import { prisma } from '../lib/prisma';
+import { calculateQuoteSchema, quoteHistoryQuerySchema } from '../schemas/quote.schema';
+import { ZodError } from 'zod';
+
+const router = Router();
+
+// POST /api/quote/calculate
+router.post('/calculate', async (req: Request, res: Response) => {
+  try {
+    const input = calculateQuoteSchema.parse(req.body);
+
+    const result = calculateTaxiQuote({
+      distanceKm: input.distanceKm,
+      returnDistanceKm: input.returnDistanceKm,
+      totalDistanceKm: input.totalDistanceKm,
+      estimatedMinutes: input.estimatedMinutes,
+      tripType: input.tripType,
+      consumptionKmPerLiter: input.consumptionKmPerLiter,
+      fuelPricePerLiter: input.fuelPricePerLiter,
+      vehicleExtraCostPerKm: input.vehicleExtraCostPerKm,
+      baseFare: input.baseFare,
+      pricePerKm: input.pricePerKm,
+      waitingPrice: input.waitingPrice,
+      waitingChargeType: input.waitingChargeType,
+      flagMultiplier: input.flagMultiplier,
+      tollOutbound: input.tollOutbound,
+      tollReturn: input.tollReturn,
+      parkingCost: input.parkingCost,
+      extraCosts: input.extraCosts,
+      desiredMarginPercent: input.desiredMarginPercent,
+      driverMinimumValue: input.driverMinimumValue,
+      customChargedPrice: input.customChargedPrice,
+    });
+
+    // Resolve anonymous session id
+    const anonymousId = req.anonymousId;
+    let anonymousSessionId: string | null = null;
+    if (anonymousId) {
+      const session = await prisma.anonymousSession.findUnique({ where: { sessionId: anonymousId } });
+      if (session) anonymousSessionId = session.id;
+    }
+
+    // userId vem do middleware (null se não logado)
+    const userId = req.userId ?? null;
+
+    const quote = await prisma.quote.create({
+      data: {
+        userId,
+        anonymousSessionId,
+        originAddress: input.originAddress,
+        destinationAddress: input.destinationAddress,
+        tripType: input.tripType,
+        routeMode: input.routeMode,
+        distanceKm: result.distanceKm,
+        returnDistanceKm: result.returnDistanceKm,
+        totalDistanceKm: result.totalDistanceKm,
+        estimatedMinutes: result.estimatedMinutes,
+        consumptionKmPerLiter: input.consumptionKmPerLiter,
+        fuelPricePerLiter: input.fuelPricePerLiter,
+        fuelType: input.fuelType,
+        vehicleExtraCostPerKm: input.vehicleExtraCostPerKm,
+        baseFare: input.baseFare,
+        pricePerKm: input.pricePerKm,
+        waitingPrice: input.waitingPrice,
+        waitingChargeType: input.waitingChargeType,
+        flagMultiplier: input.flagMultiplier,
+        tollOutbound: input.tollOutbound,
+        tollReturn: input.tollReturn,
+        parkingCost: input.parkingCost,
+        extraCosts: input.extraCosts,
+        desiredMarginPercent: input.desiredMarginPercent,
+        driverMinimumValue: input.driverMinimumValue,
+        customChargedPrice: input.customChargedPrice,
+        fuelCost: result.fuelCost,
+        vehicleExtraCost: result.vehicleExtraCost,
+        tollTotal: result.tollTotal,
+        totalCost: result.totalCost,
+        timeCharge: result.timeCharge,
+        farePrice: result.farePrice,
+        minimumPrice: result.minimumPrice,
+        recommendedPrice: result.recommendedPrice,
+        idealPrice: result.idealPrice,
+        profit: result.profit,
+        margin: result.margin,
+        alerts: result.alerts as object[],
+        stops: input.stops?.length
+          ? { create: input.stops.map((address, index) => ({ order: index, address })) }
+          : undefined,
+      },
+      include: { stops: true },
+    });
+
+    await prisma.quoteEvent.create({
+      data: {
+        quoteId: quote.id,
+        eventType: 'calculated',
+        metadata: { tripType: input.tripType, routeMode: input.routeMode },
+      },
+    });
+
+    return res.status(201).json({ success: true, data: { quoteId: quote.id, result } });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ success: false, error: 'Dados inválidos', details: error.errors });
+    }
+    console.error('Error calculating quote:', error);
+    return res.status(500).json({ success: false, error: 'Erro interno ao calcular a corrida' });
+  }
+});
+
+// GET /api/quotes/history
+router.get('/history', async (req: Request, res: Response) => {
+  try {
+    const query = quoteHistoryQuerySchema.parse(req.query);
+    const skip = (query.page - 1) * query.limit;
+
+    // Taxista logado → busca por userId (inclui todos os dispositivos)
+    if (req.userId) {
+      const [quotes, total] = await Promise.all([
+        prisma.quote.findMany({
+          where: { userId: req.userId },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: query.limit,
+          include: { stops: true },
+        }),
+        prisma.quote.count({ where: { userId: req.userId } }),
+      ]);
+      return res.json({ success: true, data: { quotes, total, page: query.page, totalPages: Math.ceil(total / query.limit) } });
+    }
+
+    // Anônimo → busca por anonymous session
+    const anonymousId = query.anonymousId || req.anonymousId;
+    if (!anonymousId) return res.json({ success: true, data: { quotes: [], total: 0 } });
+
+    const session = await prisma.anonymousSession.findUnique({ where: { sessionId: anonymousId } });
+    if (!session) return res.json({ success: true, data: { quotes: [], total: 0 } });
+
+    const [quotes, total] = await Promise.all([
+      prisma.quote.findMany({
+        where: { anonymousSessionId: session.id },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: query.limit,
+        include: { stops: true },
+      }),
+      prisma.quote.count({ where: { anonymousSessionId: session.id } }),
+    ]);
+
+    return res.json({ success: true, data: { quotes, total, page: query.page, totalPages: Math.ceil(total / query.limit) } });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ success: false, error: 'Parâmetros inválidos', details: error.errors });
+    }
+    console.error('Error fetching history:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar histórico' });
+  }
+});
+
+// GET /api/quotes/:id
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const quote = await prisma.quote.findUnique({
+      where: { id },
+      include: { stops: true, events: true },
+    });
+
+    if (!quote) return res.status(404).json({ success: false, error: 'Cotação não encontrada' });
+
+    // Só o dono pode ver
+    const isOwner =
+      (req.userId && quote.userId === req.userId) ||
+      (!req.userId && quote.anonymousSession &&
+        (await prisma.anonymousSession.findUnique({ where: { id: quote.anonymousSessionId ?? '' } }))?.sessionId === req.anonymousId);
+
+    if (!isOwner) return res.status(403).json({ success: false, error: 'Sem acesso a esta cotação.' });
+
+    return res.json({ success: true, data: quote });
+  } catch (error) {
+    console.error('Error fetching quote:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar cotação' });
+  }
+});
+
+export default router;

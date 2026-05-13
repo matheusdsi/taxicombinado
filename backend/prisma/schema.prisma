@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  name         String?
+  phone        String?
+  passwordHash String?  @map("password_hash")
+  role         String   @default("driver")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  vehicles           Vehicle[]
+  taxiFareProfiles   TaxiFareProfile[]
+  quotes             Quote[]
+  anonymousSessions  AnonymousSession[]
+
+  @@map("users")
+}
+
+model AnonymousSession {
+  id        String   @id @default(uuid())
+  sessionId String   @unique @map("session_id")
+  userId    String?  @map("user_id")
+  userAgent String?  @map("user_agent")
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+  lastSeen  DateTime @updatedAt @map("last_seen")
+
+  user   User?   @relation(fields: [userId], references: [id])
+  quotes Quote[]
+
+  @@map("anonymous_sessions")
+}
+
+model Vehicle {
+  id                   String   @id @default(uuid())
+  userId               String?  @map("user_id")
+  name                 String
+  fuelType             String   @default("gasoline") @map("fuel_type")
+  consumptionKmPerLiter Float   @map("consumption_km_per_liter")
+  extraCostPerKm       Float    @default(0) @map("extra_cost_per_km")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user   User?   @relation(fields: [userId], references: [id])
+  quotes Quote[]
+
+  @@map("vehicles")
+}
+
+model TaxiFareProfile {
+  id               String   @id @default(uuid())
+  userId           String?  @map("user_id")
+  name             String
+  baseFare         Float    @map("base_fare")
+  pricePerKm       Float    @map("price_per_km")
+  waitingPrice     Float    @map("waiting_price")
+  waitingChargeType String  @default("per_minute") @map("waiting_charge_type")
+  flagMultiplier   Float    @default(1.0) @map("flag_multiplier")
+  isDefault        Boolean  @default(false) @map("is_default")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user   User?   @relation(fields: [userId], references: [id])
+  quotes Quote[]
+
+  @@map("taxi_fare_profiles")
+}
+
+model Quote {
+  id                    String   @id @default(uuid())
+  userId                String?  @map("user_id")
+  anonymousSessionId    String?  @map("anonymous_session_id")
+  vehicleId             String?  @map("vehicle_id")
+  taxiFareProfileId     String?  @map("taxi_fare_profile_id")
+
+  // Route data
+  originAddress         String?  @map("origin_address")
+  destinationAddress    String?  @map("destination_address")
+  tripType              String   @default("one_way") @map("trip_type")
+  routeMode             String   @default("manual") @map("route_mode")
+  distanceKm            Float    @map("distance_km")
+  returnDistanceKm      Float?   @map("return_distance_km")
+  totalDistanceKm       Float    @map("total_distance_km")
+  estimatedMinutes      Float    @map("estimated_minutes")
+
+  // Vehicle/fuel
+  consumptionKmPerLiter Float    @map("consumption_km_per_liter")
+  fuelPricePerLiter     Float    @map("fuel_price_per_liter")
+  fuelType              String   @default("gasoline") @map("fuel_type")
+  vehicleExtraCostPerKm Float    @default(0) @map("vehicle_extra_cost_per_km")
+
+  // Fare
+  baseFare              Float    @map("base_fare")
+  pricePerKm            Float    @map("price_per_km")
+  waitingPrice          Float    @map("waiting_price")
+  waitingChargeType     String   @default("per_minute") @map("waiting_charge_type")
+  flagMultiplier        Float    @default(1.0) @map("flag_multiplier")
+
+  // Extra costs
+  tollOutbound          Float    @default(0) @map("toll_outbound")
+  tollReturn            Float    @default(0) @map("toll_return")
+  parkingCost           Float    @default(0) @map("parking_cost")
+  extraCosts            Float    @default(0) @map("extra_costs")
+
+  // Margin/pricing
+  desiredMarginPercent  Float    @default(0) @map("desired_margin_percent")
+  driverMinimumValue    Float    @default(0) @map("driver_minimum_value")
+  customChargedPrice    Float?   @map("custom_charged_price")
+
+  // Results
+  fuelCost              Float    @map("fuel_cost")
+  vehicleExtraCost      Float    @map("vehicle_extra_cost")
+  tollTotal             Float    @map("toll_total")
+  totalCost             Float    @map("total_cost")
+  timeCharge            Float    @map("time_charge")
+  farePrice             Float    @map("fare_price")
+  minimumPrice          Float    @map("minimum_price")
+  recommendedPrice      Float    @map("recommended_price")
+  idealPrice            Float    @map("ideal_price")
+  profit                Float    @map("profit")
+  margin                Float    @map("margin")
+  alerts                Json     @default("[]")
+
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user              User?             @relation(fields: [userId], references: [id])
+  anonymousSession  AnonymousSession? @relation(fields: [anonymousSessionId], references: [id])
+  vehicle           Vehicle?          @relation(fields: [vehicleId], references: [id])
+  taxiFareProfile   TaxiFareProfile?  @relation(fields: [taxiFareProfileId], references: [id])
+
+  stops   QuoteStop[]
+  events  QuoteEvent[]
+
+  @@map("quotes")
+}
+
+model QuoteStop {
+  id        String   @id @default(uuid())
+  quoteId   String   @map("quote_id")
+  order     Int
+  address   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("quote_stops")
+}
+
+model QuoteEvent {
+  id        String   @id @default(uuid())
+  quoteId   String   @map("quote_id")
+  eventType String   @map("event_type")
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("quote_events")
+}
+
+model Partner {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  description String?
+  logoUrl     String?  @map("logo_url")
+  websiteUrl  String?  @map("website_url")
+  phone       String?
+  city        String?
+  isActive    Boolean  @default(true) @map("is_active")
+  isPremium   Boolean  @default(false) @map("is_premium")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  clicks PartnerClick[]
+  leads  PartnerLead[]
+
+  @@map("partners")
+}
+
+model PartnerClick {
+  id          String   @id @default(uuid())
+  partnerId   String   @map("partner_id")
+  anonymousId String?  @map("anonymous_id")
+  source      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  @@map("partner_clicks")
+}
+
+model PartnerLead {
+  id          String   @id @default(uuid())
+  partnerId   String   @map("partner_id")
+  name        String
+  phone       String
+  email       String?
+  message     String?
+  anonymousId String?  @map("anonymous_id")
+  status      String   @default("new")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  @@map("partner_leads")
+}
+
+model DailyRouteAnalytics {
+  id               String   @id @default(uuid())
+  date             DateTime @db.Date
+  originCity       String?  @map("origin_city")
+  destinationCity  String?  @map("destination_city")
+  tripType         String   @map("trip_type")
+  totalQuotes      Int      @default(0) @map("total_quotes")
+  avgDistanceKm    Float?   @map("avg_distance_km")
+  avgRecommendedPrice Float? @map("avg_recommended_price")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([date, originCity, destinationCity, tripType])
+  @@map("daily_route_analytics")
+}
+
+model CityAnalytics {
+  id          String   @id @default(uuid())
+  city        String   @unique
+  totalQuotes Int      @default(0) @map("total_quotes")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("city_analytics")
+}
+
+model AppFeedback {
+  id          String   @id @default(uuid())
+  anonymousId String?  @map("anonymous_id")
+  rating      Int
+  category    String?
+  message     String?
+  page        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("app_feedback")
+}
