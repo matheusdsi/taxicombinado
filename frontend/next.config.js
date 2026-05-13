@@ -1,8 +1,24 @@
+const API_URL = process.env.API_URL?.replace(/\/+$/, '');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: [],
+  },
+  async rewrites() {
+    if (!API_URL) return [];
+
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${API_URL}/api/:path*`,
+      },
+      {
+        source: '/health',
+        destination: `${API_URL}/health`,
+      },
+    ];
   },
   async headers() {
     return [
