@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { formatCurrencyBRL, formatDistance, formatDuration } from '@/lib/formatters';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiUrl } from '@/lib/apiConfig';
-
-// ─── Types ────────────────────────────────────────────────────
+import { formatCurrencyBRL, formatDistance, formatDuration } from '@/lib/formatters';
 
 interface AdminStats {
   overview: {
@@ -57,7 +55,14 @@ interface AdminStats {
   };
   partners: {
     topPartners: { id?: string; name?: string; category?: string; clicks: number }[];
-    recentLeads: { id: string; name: string; phone: string; email?: string; createdAt: string; partner: { name: string; category: string } }[];
+    recentLeads: {
+      id: string;
+      name: string;
+      phone: string;
+      email?: string;
+      createdAt: string;
+      partner: { name: string; category: string };
+    }[];
   };
   recentActivity: {
     quotes: {
@@ -79,10 +84,14 @@ interface AdminStats {
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────
+interface FeatureFlags {
+  showRouteSteps: boolean;
+}
+
+type TabId = 'master' | 'quotes' | 'audience' | 'partners' | 'feedback' | 'system';
 
 const TRIP_TYPE_LABEL: Record<string, string> = {
-  one_way: 'Só ida',
+  one_way: 'So ida',
   round_trip: 'Ida e volta',
   empty_return: 'Volta vazia',
 };
@@ -92,74 +101,159 @@ const FUEL_LABEL: Record<string, string> = {
   ethanol: 'Etanol',
   gnv: 'GNV',
   diesel: 'Diesel',
-  hybrid: 'Híbrido',
-  electric: 'Elétrico',
+  hybrid: 'Hibrido',
+  electric: 'Eletrico',
   other: 'Outro',
 };
 
 const ALERT_LABEL: Record<string, string> = {
   low_profit: 'Lucro baixo',
   negative_profit: 'Lucro negativo',
-  custom_price_below_minimum: 'Preço abaixo do mínimo',
+  custom_price_below_minimum: 'Preco abaixo do minimo',
   empty_return_enabled: 'Volta vazia ativa',
-  toll_missing: 'Pedágio não informado',
+  toll_missing: 'Pedagio nao informado',
   high_margin: 'Margem alta',
   check_route: 'Conferir rota',
 };
 
-function pct(n: number, total: number) {
+const TABS: { id: TabId; label: string; description: string }[] = [
+  { id: 'master', label: 'Painel master', description: 'Resumo executivo' },
+  { id: 'quotes', label: 'Cotacoes', description: 'Rotas, precos e custos' },
+  { id: 'audience', label: 'Visitantes', description: 'Sessoes anonimas' },
+  { id: 'partners', label: 'Parceiros', description: 'Cliques e leads' },
+  { id: 'feedback', label: 'Feedback', description: 'Notas e mensagens' },
+  { id: 'system', label: 'Sistema', description: 'Controles ativos' },
+];
+
+function fmtDate(iso?: string | null) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function fmtDay(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function pct(value: number, total: number) {
   if (!total) return '0%';
-  return Math.round((n / total) * 100) + '%';
+  return `${Math.round((value / total) * 100)}%`;
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+function money(value: number | null | undefined) {
+  return value == null ? '-' : formatCurrencyBRL(value);
 }
 
-// ─── Sub-components ───────────────────────────────────────────
+function numberBR(value: number | null | undefined) {
+  return value == null ? '-' : value.toLocaleString('pt-BR');
+}
 
-function KpiCard({ label, value, sub, color = 'yellow' }: { label: string; value: string | number; sub?: string; color?: string }) {
-  const border = color === 'green' ? 'border-green-400' : color === 'blue' ? 'border-blue-400' : color === 'purple' ? 'border-purple-400' : 'border-yellow-400';
-  const text = color === 'green' ? 'text-green-600' : color === 'blue' ? 'text-blue-600' : color === 'purple' ? 'text-purple-600' : 'text-yellow-600';
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-lg border border-zinc-200 bg-white shadow-sm ${className}`}>{children}</div>;
+}
+
+function SectionHeader({ title, eyebrow }: { title: string; eyebrow?: string }) {
   return (
-    <div className={`bg-white rounded-2xl p-4 shadow-sm border-l-4 ${border}`}>
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-2xl font-black ${text}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-base font-bold text-gray-800 mt-6 mb-3 flex items-center gap-2">{children}</h2>;
-}
-
-function BarRow({ label, count, total, extra }: { label: string; count: number; total: number; extra?: string }) {
-  const width = total > 0 ? Math.round((count / total) * 100) : 0;
-  return (
-    <div className="mb-2">
-      <div className="flex justify-between text-sm mb-1">
-        <span className="text-gray-700">{label}</span>
-        <span className="font-semibold text-gray-800">{count} {extra && <span className="text-gray-400 font-normal">{extra}</span>}</span>
-      </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className="h-2 bg-yellow-400 rounded-full" style={{ width: `${width}%` }} />
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <div>
+        {eyebrow && <p className="text-[11px] font-black uppercase tracking-[0.16em] text-zinc-400">{eyebrow}</p>}
+        <h2 className="text-lg font-black text-zinc-950">{title}</h2>
       </div>
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────
+function MetricCard({
+  label,
+  value,
+  detail,
+  tone = 'dark',
+}: {
+  label: string;
+  value: string | number;
+  detail?: string;
+  tone?: 'dark' | 'yellow' | 'green' | 'blue' | 'red';
+}) {
+  const toneClass = {
+    dark: 'bg-zinc-950 text-white border-zinc-950',
+    yellow: 'bg-taxi-50 text-zinc-950 border-taxi-200',
+    green: 'bg-emerald-50 text-emerald-950 border-emerald-200',
+    blue: 'bg-sky-50 text-sky-950 border-sky-200',
+    red: 'bg-rose-50 text-rose-950 border-rose-200',
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border p-4 ${toneClass}`}>
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] opacity-70">{label}</p>
+      <p className="mt-2 text-2xl font-black leading-none">{value}</p>
+      {detail && <p className="mt-2 text-xs font-semibold opacity-70">{detail}</p>}
+    </div>
+  );
+}
+
+function BarRow({ label, count, total, detail }: { label: string; count: number; total: number; detail?: string }) {
+  const width = total > 0 ? Math.max(3, Math.round((count / total) * 100)) : 0;
+  return (
+    <div className="py-2">
+      <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+        <span className="min-w-0 truncate font-bold text-zinc-700">{label}</span>
+        <span className="shrink-0 font-black text-zinc-950">
+          {numberBR(count)} <span className="font-semibold text-zinc-400">{detail ?? pct(count, total)}</span>
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+        <div className="h-full rounded-full bg-zinc-950" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-lg border border-dashed border-zinc-200 p-5 text-center text-sm font-semibold text-zinc-400">{children}</p>;
+}
+
+function TopList({ items, total }: { items: { label: string; count: number; sub?: string }[]; total: number }) {
+  if (!items.length) return <EmptyState>Nenhum dado registrado ainda.</EmptyState>;
+  return (
+    <div className="divide-y divide-zinc-100">
+      {items.map((item, index) => (
+        <div key={`${item.label}-${index}`} className="flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-extrabold text-zinc-800">{item.label || '(em branco)'}</p>
+            {item.sub && <p className="text-xs font-semibold text-zinc-400">{item.sub}</p>}
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-black text-zinc-950">{numberBR(item.count)}</p>
+            <p className="text-[11px] font-bold text-zinc-400">{pct(item.count, total)}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [flags, setFlags] = useState<FeatureFlags | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingFlag, setSavingFlag] = useState(false);
   const [error, setError] = useState('');
   const [user, setUser] = useState<{ name?: string | null; email: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'quotes' | 'users' | 'partners' | 'feedback'>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>('master');
+
+  const fetchSettings = useCallback(async () => {
+    const res = await fetch(apiUrl('/api/admin/settings'), { credentials: 'include' });
+    if (!res.ok) return;
+    const json = await res.json();
+    setFlags(json.data);
+  }, []);
 
   const fetchStats = useCallback(async () => {
-    setLoading(true);
     setError('');
     try {
       const res = await fetch(apiUrl('/api/admin/stats'), { credentials: 'include' });
@@ -168,36 +262,39 @@ export default function AdminPage() {
         return;
       }
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Erro desconhecido');
+      if (!res.ok) throw new Error(json.error || 'Erro ao carregar dados do admin');
       setStats(json.data);
+      await fetchSettings();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar');
-    } finally {
-      setLoading(false);
+      setError(e instanceof Error ? e.message : 'Erro ao carregar dados do admin');
     }
-  }, []);
+  }, [fetchSettings]);
 
-  // Verificar sessão e carregar dados
   useEffect(() => {
     async function init() {
+      setLoading(true);
       try {
         const me = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' });
-        if (!me.ok) { window.location.href = '/admin/login'; return; }
+        if (!me.ok) {
+          window.location.href = '/admin/login';
+          return;
+        }
         const { data } = await me.json();
         setUser(data);
         await fetchStats();
       } catch {
         window.location.href = '/admin/login';
+      } finally {
+        setLoading(false);
       }
     }
     init();
   }, [fetchStats]);
 
-  // Auto-refresh a cada 60s
   useEffect(() => {
     if (!stats) return;
-    const id = setInterval(fetchStats, 60000);
-    return () => clearInterval(id);
+    const id = window.setInterval(fetchStats, 60000);
+    return () => window.clearInterval(id);
   }, [stats, fetchStats]);
 
   async function handleLogout() {
@@ -205,429 +302,451 @@ export default function AdminPage() {
     window.location.href = '/admin/login';
   }
 
+  async function updateRouteSteps(value: boolean) {
+    setSavingFlag(true);
+    try {
+      const res = await fetch(apiUrl('/api/admin/settings'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showRouteSteps: value }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao salvar configuracao');
+      setFlags(json.data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao salvar configuracao');
+    } finally {
+      setSavingFlag(false);
+    }
+  }
+
+  const computed = useMemo(() => {
+    if (!stats) return null;
+    const { overview, quoteAverages } = stats;
+    const conversion = overview.totalSessions > 0 ? (overview.totalQuotes / overview.totalSessions) * 100 : 0;
+    const leadRate = overview.totalPartnerClicks > 0 ? (overview.totalLeads / overview.totalPartnerClicks) * 100 : 0;
+    const todayDelta = overview.quotesToday - overview.quotesYesterday;
+    const avgTicket = quoteAverages.recommendedPrice ?? 0;
+    const avgProfit = quoteAverages.profit ?? 0;
+    return { conversion, leadRate, todayDelta, avgTicket, avgProfit };
+  }, [stats]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3">⏳</div>
-          <p className="text-gray-500">Carregando dados...</p>
+      <main className="min-h-screen bg-zinc-100 p-4">
+        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center">
+          <Card className="p-8 text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-950" />
+            <p className="font-extrabold text-zinc-700">Carregando painel master...</p>
+          </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
-  if (error) {
+  if (error && !stats) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-6 text-center max-w-sm w-full shadow-sm">
-          <p className="text-red-500 mb-4">{error}</p>
-          <button onClick={fetchStats} className="bg-yellow-400 text-gray-900 font-bold px-6 py-2 rounded-xl">Tentar novamente</button>
+      <main className="min-h-screen bg-zinc-100 p-4">
+        <div className="mx-auto flex min-h-[70vh] max-w-md items-center justify-center">
+          <Card className="p-6 text-center">
+            <p className="mb-4 font-bold text-rose-600">{error}</p>
+            <button onClick={fetchStats} className="rounded-lg bg-zinc-950 px-5 py-3 text-sm font-black text-white">
+              Tentar novamente
+            </button>
+          </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
-  if (!stats) return null;
+  if (!stats || !computed) return null;
 
   const { overview, quoteAverages, breakdowns, timeSeries, geography, partners, recentActivity } = stats;
-  const totalQuotes = overview.totalQuotes;
-
-  const tabs = [
-    { id: 'overview', label: '📊 Visão Geral' },
-    { id: 'quotes', label: '🧾 Cotações' },
-    { id: 'users', label: '👤 Visitantes' },
-    { id: 'partners', label: '🤝 Parceiros' },
-    { id: 'feedback', label: '💬 Feedback' },
-  ] as const;
+  const maxDailyQuotes = Math.max(1, ...timeSeries.quotesPerDay.map((item) => item.count));
+  const alertTotal = breakdowns.alertsFrequency.reduce((sum, item) => sum + item.count, 0);
+  const recentPriceRows = [...timeSeries.avgPricePerDay].reverse().slice(0, 10);
+  const recentQuoteRows = recentActivity.quotes.slice(0, 12);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="font-black text-gray-900 text-lg">🚖 Admin</h1>
-            <p className="text-xs text-gray-400">
-              {overview.firstQuoteAt ? `Desde ${new Date(overview.firstQuoteAt).toLocaleDateString('pt-BR')}` : 'Taxi Combinado'}
-            </p>
+    <main className="min-h-screen bg-[#f4f3ef] text-zinc-950">
+      <div className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-taxi-700">Taxi Combinado</p>
+              <h1 className="text-2xl font-black tracking-tight text-zinc-950 sm:text-3xl">Admin master</h1>
+              <p className="mt-1 text-sm font-semibold text-zinc-500">
+                {overview.firstQuoteAt ? `Dados desde ${new Date(overview.firstQuoteAt).toLocaleDateString('pt-BR')}` : 'Painel de operacao'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {user && <span className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold text-zinc-500">{user.name || user.email}</span>}
+              <button onClick={fetchStats} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-black text-zinc-800 hover:bg-zinc-50">
+                Atualizar
+              </button>
+              <button onClick={handleLogout} className="rounded-lg bg-zinc-950 px-3 py-2 text-xs font-black text-white hover:bg-zinc-800">
+                Sair
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {user && (
-              <span className="text-xs text-gray-400 hidden sm:block">
-                {user.name || user.email}
-              </span>
-            )}
-            <button
-              onClick={fetchStats}
-              className="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-3 py-1.5 rounded-lg font-semibold"
-            >
-              ↻ Atualizar
-            </button>
-            <button
-              onClick={handleLogout}
-              className="text-xs text-gray-400 hover:text-red-500"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="max-w-5xl mx-auto px-4 flex gap-1 pb-2 overflow-x-auto">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`whitespace-nowrap text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${
-                activeTab === t.id
-                  ? 'bg-yellow-400 text-gray-900'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+          {error && <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{error}</p>}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 pb-16">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[250px_1fr]">
+        <aside className="lg:sticky lg:top-5 lg:self-start">
+          <Card className="overflow-hidden p-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`mb-1 w-full rounded-md px-3 py-3 text-left transition-colors last:mb-0 ${
+                  activeTab === tab.id ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                <span className="block text-sm font-black">{tab.label}</span>
+                <span className={`block text-xs font-semibold ${activeTab === tab.id ? 'text-zinc-300' : 'text-zinc-400'}`}>{tab.description}</span>
+              </button>
+            ))}
+          </Card>
+        </aside>
 
-        {/* ── VISÃO GERAL ─────────────────────────────────── */}
-        {activeTab === 'overview' && (
-          <>
-            <SectionTitle>🔢 Cotações</SectionTitle>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="Total" value={totalQuotes.toLocaleString('pt-BR')} color="yellow" />
-              <KpiCard label="Hoje" value={overview.quotesToday} sub={`Ontem: ${overview.quotesYesterday}`} color="yellow" />
-              <KpiCard label="Últimos 7 dias" value={overview.quotesLast7} color="yellow" />
-              <KpiCard label="Últimos 30 dias" value={overview.quotesLast30} color="yellow" />
-            </div>
+        <section className="min-w-0">
+          {activeTab === 'master' && (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard label="Cotacoes totais" value={numberBR(overview.totalQuotes)} detail={`${overview.quotesToday} hoje, ${overview.quotesYesterday} ontem`} />
+                <MetricCard label="Preco medio" value={money(computed.avgTicket)} detail={`Lucro medio ${money(computed.avgProfit)}`} tone="yellow" />
+                <MetricCard label="Visitantes" value={numberBR(overview.totalSessions)} detail={`${computed.conversion.toFixed(1)}% cotacoes por sessao`} tone="blue" />
+                <MetricCard label="Parceiros" value={numberBR(overview.totalPartners)} detail={`${overview.totalPartnerClicks} cliques, ${overview.totalLeads} leads`} tone="green" />
+              </div>
 
-            <SectionTitle>👤 Visitantes</SectionTitle>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <KpiCard label="Total de sessões" value={overview.totalSessions.toLocaleString('pt-BR')} color="blue" />
-              <KpiCard label="Sessões hoje" value={overview.sessionsToday} color="blue" />
-              <KpiCard label="Cotações/sessão" value={overview.totalSessions > 0 ? (totalQuotes / overview.totalSessions).toFixed(1) : '—'} color="blue" />
-            </div>
-
-            <SectionTitle>💰 Médias por Cotação</SectionTitle>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <KpiCard label="Preço Recomendado Médio" value={quoteAverages.recommendedPrice ? formatCurrencyBRL(quoteAverages.recommendedPrice) : '—'} color="green" />
-              <KpiCard label="Custo Total Médio" value={quoteAverages.totalCost ? formatCurrencyBRL(quoteAverages.totalCost) : '—'} color="green" />
-              <KpiCard label="Lucro Médio" value={quoteAverages.profit ? formatCurrencyBRL(quoteAverages.profit) : '—'} color="green" />
-              <KpiCard label="Margem Média" value={quoteAverages.margin != null ? `${quoteAverages.margin.toFixed(1)}%` : '—'} color="green" />
-              <KpiCard label="Distância Média (ida)" value={quoteAverages.distanceKm ? formatDistance(quoteAverages.distanceKm) : '—'} color="blue" />
-              <KpiCard label="Tempo Médio" value={quoteAverages.estimatedMinutes ? formatDuration(quoteAverages.estimatedMinutes) : '—'} color="blue" />
-              <KpiCard label="Combustível Médio/L" value={quoteAverages.fuelPricePerLiter ? formatCurrencyBRL(quoteAverages.fuelPricePerLiter) : '—'} color="yellow" />
-              <KpiCard label="Consumo Médio" value={quoteAverages.consumptionKmPerLiter ? `${quoteAverages.consumptionKmPerLiter.toFixed(1)} km/l` : '—'} color="yellow" />
-              <KpiCard label="Pedágio Médio" value={quoteAverages.tollTotal ? formatCurrencyBRL(quoteAverages.tollTotal) : '—'} color="yellow" />
-              <KpiCard label="Menor Preço Cotado" value={quoteAverages.minRecommendedPrice ? formatCurrencyBRL(quoteAverages.minRecommendedPrice) : '—'} color="purple" />
-              <KpiCard label="Maior Preço Cotado" value={quoteAverages.maxRecommendedPrice ? formatCurrencyBRL(quoteAverages.maxRecommendedPrice) : '—'} color="purple" />
-              <KpiCard label="Margem Desejada Média" value={quoteAverages.desiredMarginPercent != null ? `${quoteAverages.desiredMarginPercent.toFixed(1)}%` : '—'} color="purple" />
-            </div>
-
-            <SectionTitle>🤝 Parceiros</SectionTitle>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="Parceiros Ativos" value={overview.totalPartners} color="purple" />
-              <KpiCard label="Cliques Total" value={overview.totalPartnerClicks} color="purple" />
-              <KpiCard label="Cliques Hoje" value={overview.partnerClicksToday} color="purple" />
-              <KpiCard label="Leads Total" value={overview.totalLeads} sub={`Hoje: ${overview.leadsToday}`} color="purple" />
-            </div>
-
-            <SectionTitle>📈 Cotações por dia (últimos 30 dias)</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {timeSeries.quotesPerDay.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-4">Nenhum dado ainda</p>
-              ) : (
-                <div className="space-y-1">
-                  {[...timeSeries.quotesPerDay].reverse().slice(0, 14).map((d) => (
-                    <div key={d.day} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400 w-20 shrink-0">
-                        {new Date(d.day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                      </span>
-                      <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-5 bg-yellow-400 rounded-full flex items-center justify-end pr-1"
-                          style={{ width: `${Math.max(4, (d.count / Math.max(...timeSeries.quotesPerDay.map((x) => x.count))) * 100)}%` }}
-                        >
-                          <span className="text-xs font-bold text-gray-800">{d.count}</span>
+              <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+                <Card className="p-5">
+                  <SectionHeader title="Ritmo dos ultimos 30 dias" eyebrow="Volume" />
+                  {timeSeries.quotesPerDay.length === 0 ? (
+                    <EmptyState>Nenhuma cotacao nos ultimos 30 dias.</EmptyState>
+                  ) : (
+                    <div className="flex h-64 items-end gap-2 border-b border-zinc-200 pt-5">
+                      {timeSeries.quotesPerDay.map((day) => (
+                        <div key={day.day} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
+                          <div className="relative flex h-52 w-full items-end rounded-t-md bg-zinc-100">
+                            <div
+                              className="w-full rounded-t-md bg-taxi-500 transition-all group-hover:bg-zinc-950"
+                              style={{ height: `${Math.max(5, (day.count / maxDailyQuotes) * 100)}%` }}
+                              title={`${fmtDay(day.day)}: ${day.count} cotacoes`}
+                            />
+                          </div>
+                          <span className="hidden text-[10px] font-bold text-zinc-400 sm:block">{fmtDay(day.day)}</span>
                         </div>
-                      </div>
+                      ))}
                     </div>
+                  )}
+                </Card>
+
+                <Card className="p-5">
+                  <SectionHeader title="Leitura rapida" eyebrow="Hoje" />
+                  <div className="space-y-3">
+                    <div className="rounded-lg bg-zinc-950 p-4 text-white">
+                      <p className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Comparado com ontem</p>
+                      <p className="mt-2 text-3xl font-black">{computed.todayDelta >= 0 ? '+' : ''}{computed.todayDelta}</p>
+                      <p className="text-xs font-semibold text-zinc-400">cotacoes de diferenca</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <MetricCard label="7 dias" value={overview.quotesLast7} tone="yellow" />
+                      <MetricCard label="30 dias" value={overview.quotesLast30} tone="blue" />
+                      <MetricCard label="Leads hoje" value={overview.leadsToday} tone="green" />
+                      <MetricCard label="Cliques hoje" value={overview.partnerClicksToday} tone="green" />
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-3">
+                <Card className="p-5 xl:col-span-2">
+                  <SectionHeader title="Ultimas cotacoes" eyebrow="Operacao" />
+                  <QuotesTable rows={recentQuoteRows} />
+                </Card>
+                <Card className="p-5">
+                  <SectionHeader title="Alertas frequentes" eyebrow="Risco" />
+                  {breakdowns.alertsFrequency.length === 0 ? (
+                    <EmptyState>Nenhum alerta registrado.</EmptyState>
+                  ) : (
+                    breakdowns.alertsFrequency.slice(0, 8).map((item) => (
+                      <BarRow key={item.type} label={ALERT_LABEL[item.type] || item.type} count={item.count} total={alertTotal} />
+                    ))
+                  )}
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'quotes' && (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard label="Preco recomendado" value={money(quoteAverages.recommendedPrice)} tone="yellow" />
+                <MetricCard label="Custo medio" value={money(quoteAverages.totalCost)} tone="red" />
+                <MetricCard label="Lucro medio" value={money(quoteAverages.profit)} tone="green" />
+                <MetricCard label="Margem media" value={quoteAverages.margin != null ? `${quoteAverages.margin.toFixed(1)}%` : '-'} tone="blue" />
+                <MetricCard label="Distancia media" value={quoteAverages.distanceKm ? formatDistance(quoteAverages.distanceKm) : '-'} tone="blue" />
+                <MetricCard label="Tempo medio" value={quoteAverages.estimatedMinutes ? formatDuration(quoteAverages.estimatedMinutes) : '-'} tone="blue" />
+                <MetricCard label="Menor preco" value={money(quoteAverages.minRecommendedPrice)} />
+                <MetricCard label="Maior preco" value={money(quoteAverages.maxRecommendedPrice)} />
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-2">
+                <Card className="p-5">
+                  <SectionHeader title="Tipo de corrida" />
+                  {breakdowns.tripType.map((item) => (
+                    <BarRow key={item.tripType} label={TRIP_TYPE_LABEL[item.tripType] || item.tripType} count={item.count} total={overview.totalQuotes} detail={`${item.percent}%`} />
                   ))}
-                </div>
-              )}
-            </div>
-
-            <SectionTitle>💸 Preço médio por dia (últimos 30 dias)</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm overflow-x-auto">
-              {timeSeries.avgPricePerDay.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-4">Nenhum dado ainda</p>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-gray-400 border-b">
-                      <th className="text-left pb-2">Dia</th>
-                      <th className="text-right pb-2">Preço Rec.</th>
-                      <th className="text-right pb-2">Custo</th>
-                      <th className="text-right pb-2">Lucro</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...timeSeries.avgPricePerDay].reverse().slice(0, 14).map((d) => (
-                      <tr key={d.day} className="border-b border-gray-50">
-                        <td className="py-1.5 text-gray-500">{new Date(d.day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</td>
-                        <td className="py-1.5 text-right font-semibold text-green-600">{formatCurrencyBRL(d.avg_price)}</td>
-                        <td className="py-1.5 text-right text-red-500">{formatCurrencyBRL(d.avg_cost)}</td>
-                        <td className="py-1.5 text-right text-blue-600">{formatCurrencyBRL(d.avg_profit)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* ── COTAÇÕES ────────────────────────────────────── */}
-        {activeTab === 'quotes' && (
-          <>
-            <SectionTitle>🛣️ Tipo de corrida</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {breakdowns.tripType.map((t) => (
-                <BarRow key={t.tripType} label={TRIP_TYPE_LABEL[t.tripType] || t.tripType} count={t.count} total={totalQuotes} extra={`(${t.percent}%)`} />
-              ))}
-            </div>
-
-            <SectionTitle>⛽ Combustível mais usado</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {breakdowns.fuelType.map((f) => (
-                <BarRow key={f.fuelType} label={FUEL_LABEL[f.fuelType] || f.fuelType} count={f.count} total={totalQuotes} extra={`(${f.percent}%)`} />
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <h3 className="font-bold text-sm text-gray-700 mb-3">📏 Distância das corridas</h3>
-                {breakdowns.distanceRanges.map((r) => (
-                  <BarRow key={r.range} label={r.range} count={r.count} total={totalQuotes} extra={pct(r.count, totalQuotes)} />
-                ))}
+                </Card>
+                <Card className="p-5">
+                  <SectionHeader title="Combustivel usado" />
+                  {breakdowns.fuelType.map((item) => (
+                    <BarRow key={item.fuelType} label={FUEL_LABEL[item.fuelType] || item.fuelType} count={item.count} total={overview.totalQuotes} detail={`${item.percent}%`} />
+                  ))}
+                </Card>
+                <Card className="p-5">
+                  <SectionHeader title="Faixa de distancia" />
+                  {breakdowns.distanceRanges.map((item) => (
+                    <BarRow key={item.range} label={item.range} count={item.count} total={overview.totalQuotes} />
+                  ))}
+                </Card>
+                <Card className="p-5">
+                  <SectionHeader title="Faixa de preco" />
+                  {breakdowns.priceRanges.map((item) => (
+                    <BarRow key={item.range} label={item.range} count={item.count} total={overview.totalQuotes} />
+                  ))}
+                </Card>
               </div>
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <h3 className="font-bold text-sm text-gray-700 mb-3">💵 Faixa de preço cobrado</h3>
-                {breakdowns.priceRanges.map((r) => (
-                  <BarRow key={r.range} label={r.range} count={r.count} total={totalQuotes} extra={pct(r.count, totalQuotes)} />
-                ))}
+
+              <div className="grid gap-5 xl:grid-cols-2">
+                <Card className="p-5">
+                  <SectionHeader title="Origens mais frequentes" />
+                  <TopList items={geography.topOrigins.map((item) => ({ label: item.origin, count: item.count }))} total={overview.totalQuotes} />
+                </Card>
+                <Card className="p-5">
+                  <SectionHeader title="Destinos mais frequentes" />
+                  <TopList items={geography.topDestinations.map((item) => ({ label: item.destination, count: item.count }))} total={overview.totalQuotes} />
+                </Card>
               </div>
-            </div>
 
-            <SectionTitle>🚦 Modo de cálculo</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm flex gap-6">
-              {breakdowns.routeMode.map((r) => (
-                <div key={r.routeMode} className="text-center">
-                  <p className="text-2xl font-black text-gray-800">{r.count}</p>
-                  <p className="text-xs text-gray-500">{r.routeMode === 'manual' ? 'Manual' : 'Automático'}</p>
-                </div>
-              ))}
-            </div>
-
-            <SectionTitle>⚠️ Alertas mais frequentes</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {breakdowns.alertsFrequency.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhum dado ainda</p>
-              ) : (
-                breakdowns.alertsFrequency.map((a) => (
-                  <BarRow key={a.type} label={ALERT_LABEL[a.type] || a.type} count={a.count} total={breakdowns.alertsFrequency.reduce((s, x) => s + x.count, 0)} />
-                ))
-              )}
-            </div>
-
-            <SectionTitle>📍 Origens mais frequentes</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {geography.topOrigins.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhum dado ainda</p>
-              ) : (
-                geography.topOrigins.map((o, i) => (
-                  <div key={i} className="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
-                    <span className="text-gray-700 truncate flex-1 mr-3">{o.origin || '(em branco)'}</span>
-                    <span className="font-bold text-gray-800 shrink-0">{o.count}×</span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <SectionTitle>🏁 Destinos mais frequentes</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {geography.topDestinations.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhum dado ainda</p>
-              ) : (
-                geography.topDestinations.map((d, i) => (
-                  <div key={i} className="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
-                    <span className="text-gray-700 truncate flex-1 mr-3">{d.destination || '(em branco)'}</span>
-                    <span className="font-bold text-gray-800 shrink-0">{d.count}×</span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <SectionTitle>🕐 Últimas cotações</SectionTitle>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr className="text-gray-400">
-                      <th className="text-left p-3">Data</th>
-                      <th className="text-left p-3">Rota</th>
-                      <th className="text-right p-3">Dist.</th>
-                      <th className="text-right p-3">Preço Rec.</th>
-                      <th className="text-right p-3">Custo</th>
-                      <th className="text-right p-3">Lucro</th>
-                      <th className="text-right p-3">Margem</th>
-                      <th className="text-left p-3">Tipo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentActivity.quotes.map((q) => (
-                      <tr key={q.id} className="border-t border-gray-50 hover:bg-gray-50">
-                        <td className="p-3 whitespace-nowrap text-gray-400">{fmtDate(q.createdAt)}</td>
-                        <td className="p-3 text-gray-700 max-w-[160px]">
-                          <span className="block truncate">{q.originAddress || '—'}</span>
-                          <span className="block truncate text-gray-400">→ {q.destinationAddress || '—'}</span>
-                        </td>
-                        <td className="p-3 text-right text-gray-600">{formatDistance(q.distanceKm)}</td>
-                        <td className="p-3 text-right font-bold text-green-600">{formatCurrencyBRL(q.recommendedPrice)}</td>
-                        <td className="p-3 text-right text-red-500">{formatCurrencyBRL(q.totalCost)}</td>
-                        <td className="p-3 text-right text-blue-600">{formatCurrencyBRL(q.profit)}</td>
-                        <td className="p-3 text-right">{q.margin.toFixed(1)}%</td>
-                        <td className="p-3 text-gray-500">{TRIP_TYPE_LABEL[q.tripType] || q.tripType}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── VISITANTES ──────────────────────────────────── */}
-        {activeTab === 'users' && (
-          <>
-            <SectionTitle>👤 Sessões anônimas recentes</SectionTitle>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr className="text-gray-400">
-                      <th className="text-left p-3">ID da sessão</th>
-                      <th className="text-right p-3">Cotações</th>
-                      <th className="text-left p-3">Primeira visita</th>
-                      <th className="text-left p-3">Última visita</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentActivity.sessions.map((s) => (
-                      <tr key={s.id} className="border-t border-gray-50 hover:bg-gray-50">
-                        <td className="p-3 font-mono text-gray-500">{s.sessionId.slice(0, 8)}…</td>
-                        <td className="p-3 text-right font-bold text-yellow-600">{s._count.quotes}</td>
-                        <td className="p-3 text-gray-400">{fmtDate(s.createdAt)}</td>
-                        <td className="p-3 text-gray-400">{fmtDate(s.lastSeen)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">IDs abreviados — dados de sessão são anônimos por design.</p>
-          </>
-        )}
-
-        {/* ── PARCEIROS ───────────────────────────────────── */}
-        {activeTab === 'partners' && (
-          <>
-            <SectionTitle>🏆 Parceiros mais clicados</SectionTitle>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              {partners.topPartners.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhum clique registrado ainda</p>
-              ) : (
-                partners.topPartners.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="font-semibold text-sm text-gray-800">{p.name || '—'}</p>
-                      <p className="text-xs text-gray-400">{p.category || '—'}</p>
-                    </div>
-                    <span className="font-black text-yellow-600 text-lg">{p.clicks}</span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <SectionTitle>📋 Leads recentes</SectionTitle>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              {partners.recentLeads.length === 0 ? (
-                <p className="text-gray-400 text-sm p-4">Nenhum lead ainda</p>
-              ) : (
+              <Card className="p-5">
+                <SectionHeader title="Preco, custo e lucro por dia" eyebrow="Ultimos registros" />
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50">
-                      <tr className="text-gray-400">
-                        <th className="text-left p-3">Nome</th>
-                        <th className="text-left p-3">WhatsApp</th>
-                        <th className="text-left p-3">Parceiro</th>
-                        <th className="text-left p-3">Data</th>
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
+                        <th className="py-3 text-left">Dia</th>
+                        <th className="py-3 text-right">Preco medio</th>
+                        <th className="py-3 text-right">Custo medio</th>
+                        <th className="py-3 text-right">Lucro medio</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {partners.recentLeads.map((l) => (
-                        <tr key={l.id} className="border-t border-gray-50 hover:bg-gray-50">
-                          <td className="p-3 font-semibold text-gray-800">{l.name}</td>
-                          <td className="p-3 text-blue-600">
-                            <a href={`https://wa.me/${l.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{l.phone}</a>
-                          </td>
-                          <td className="p-3 text-gray-500">{l.partner?.name || '—'}</td>
-                          <td className="p-3 text-gray-400">{fmtDate(l.createdAt)}</td>
+                    <tbody className="divide-y divide-zinc-100">
+                      {recentPriceRows.map((item) => (
+                        <tr key={item.day}>
+                          <td className="py-3 font-bold text-zinc-600">{fmtDay(item.day)}</td>
+                          <td className="py-3 text-right font-black text-emerald-700">{formatCurrencyBRL(item.avg_price)}</td>
+                          <td className="py-3 text-right font-bold text-rose-600">{formatCurrencyBRL(item.avg_cost)}</td>
+                          <td className="py-3 text-right font-bold text-sky-700">{formatCurrencyBRL(item.avg_profit)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+              </Card>
             </div>
-          </>
-        )}
+          )}
 
-        {/* ── FEEDBACK ────────────────────────────────────── */}
-        {activeTab === 'feedback' && (
-          <>
-            <SectionTitle>⭐ Resumo</SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
-              <KpiCard label="Total de feedbacks" value={overview.totalFeedback} color="purple" />
-              <KpiCard label="Nota média" value={overview.avgRating != null ? `${overview.avgRating}/5` : '—'} color="green" />
+          {activeTab === 'audience' && (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MetricCard label="Sessoes totais" value={numberBR(overview.totalSessions)} tone="blue" />
+                <MetricCard label="Sessoes hoje" value={numberBR(overview.sessionsToday)} tone="blue" />
+                <MetricCard label="Cotacoes por sessao" value={`${computed.conversion.toFixed(1)}%`} tone="yellow" />
+              </div>
+              <Card className="p-5">
+                <SectionHeader title="Sessoes anonimas recentes" />
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[620px] text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
+                        <th className="py-3 text-left">Sessao</th>
+                        <th className="py-3 text-right">Cotacoes</th>
+                        <th className="py-3 text-left">Primeira visita</th>
+                        <th className="py-3 text-left">Ultima visita</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {recentActivity.sessions.map((session) => (
+                        <tr key={session.id}>
+                          <td className="py-3 font-mono text-xs font-bold text-zinc-500">{session.sessionId.slice(0, 12)}...</td>
+                          <td className="py-3 text-right font-black text-zinc-950">{session._count.quotes}</td>
+                          <td className="py-3 font-semibold text-zinc-500">{fmtDate(session.createdAt)}</td>
+                          <td className="py-3 font-semibold text-zinc-500">{fmtDate(session.lastSeen)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </div>
+          )}
 
-            <SectionTitle>💬 Feedbacks recentes</SectionTitle>
-            <div className="space-y-3">
-              {recentActivity.feedback.length === 0 ? (
-                <p className="text-gray-400 text-sm">Nenhum feedback ainda</p>
-              ) : (
-                recentActivity.feedback.map((f) => (
-                  <div key={f.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex gap-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <span key={i} className={i < f.rating ? 'text-yellow-400' : 'text-gray-200'}>★</span>
-                        ))}
-                      </div>
-                      <span className="text-xs text-gray-400">{fmtDate(f.createdAt)}</span>
+          {activeTab === 'partners' && (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <MetricCard label="Parceiros ativos" value={overview.totalPartners} tone="green" />
+                <MetricCard label="Cliques totais" value={overview.totalPartnerClicks} tone="green" />
+                <MetricCard label="Leads totais" value={overview.totalLeads} tone="yellow" />
+                <MetricCard label="Conversao lead" value={`${computed.leadRate.toFixed(1)}%`} tone="blue" />
+              </div>
+              <div className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr]">
+                <Card className="p-5">
+                  <SectionHeader title="Parceiros mais clicados" />
+                  <TopList items={partners.topPartners.map((item) => ({ label: item.name || '-', sub: item.category || '-', count: item.clicks }))} total={Math.max(1, overview.totalPartnerClicks)} />
+                </Card>
+                <Card className="p-5">
+                  <SectionHeader title="Leads recentes" />
+                  {partners.recentLeads.length === 0 ? (
+                    <EmptyState>Nenhum lead registrado ainda.</EmptyState>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[620px] text-sm">
+                        <thead>
+                          <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
+                            <th className="py-3 text-left">Nome</th>
+                            <th className="py-3 text-left">WhatsApp</th>
+                            <th className="py-3 text-left">Parceiro</th>
+                            <th className="py-3 text-left">Data</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                          {partners.recentLeads.map((lead) => (
+                            <tr key={lead.id}>
+                              <td className="py-3 font-black text-zinc-800">{lead.name}</td>
+                              <td className="py-3 font-bold text-sky-700">
+                                <a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                                  {lead.phone}
+                                </a>
+                              </td>
+                              <td className="py-3 font-semibold text-zinc-500">{lead.partner?.name || '-'}</td>
+                              <td className="py-3 font-semibold text-zinc-500">{fmtDate(lead.createdAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    {f.category && <span className="inline-block text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mb-2">{f.category}</span>}
-                    {f.message && <p className="text-sm text-gray-700">{f.message}</p>}
-                  </div>
-                ))
-              )}
+                  )}
+                </Card>
+              </div>
             </div>
-          </>
-        )}
+          )}
+
+          {activeTab === 'feedback' && (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <MetricCard label="Total de feedbacks" value={overview.totalFeedback} tone="yellow" />
+                <MetricCard label="Nota media" value={overview.avgRating != null ? `${overview.avgRating}/5` : '-'} tone="green" />
+              </div>
+              <div className="grid gap-3">
+                {recentActivity.feedback.length === 0 ? (
+                  <Card className="p-5">
+                    <EmptyState>Nenhum feedback registrado ainda.</EmptyState>
+                  </Card>
+                ) : (
+                  recentActivity.feedback.map((item) => (
+                    <Card key={item.id} className="p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-lg font-black text-zinc-950">Nota {item.rating}/5</p>
+                          {item.category && <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">{item.category}</p>}
+                        </div>
+                        <p className="text-xs font-bold text-zinc-400">{fmtDate(item.createdAt)}</p>
+                      </div>
+                      {item.message && <p className="mt-3 text-sm font-semibold leading-6 text-zinc-600">{item.message}</p>}
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'system' && (
+            <div className="space-y-5">
+              <Card className="p-5">
+                <SectionHeader title="Controles do aplicativo" eyebrow="Backend existente" />
+                <div className="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-black text-zinc-950">Mostrar passo a passo da rota</p>
+                    <p className="mt-1 text-sm font-semibold text-zinc-500">Liga ou desliga a exibicao de instrucoes detalhadas da rota quando disponivel.</p>
+                  </div>
+                  <button
+                    disabled={!flags || savingFlag}
+                    onClick={() => flags && updateRouteSteps(!flags.showRouteSteps)}
+                    className={`w-full rounded-lg px-4 py-3 text-sm font-black sm:w-auto ${
+                      flags?.showRouteSteps ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-600'
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {savingFlag ? 'Salvando...' : flags?.showRouteSteps ? 'Ativo' : 'Inativo'}
+                  </button>
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <SectionHeader title="Resumo tecnico visivel" />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <MetricCard label="Modo automatico" value={breakdowns.routeMode.find((item) => item.routeMode === 'automatic')?.count ?? 0} tone="blue" />
+                  <MetricCard label="Modo manual" value={breakdowns.routeMode.find((item) => item.routeMode === 'manual')?.count ?? 0} tone="yellow" />
+                  <MetricCard label="Alertas gerados" value={alertTotal} tone={alertTotal > 0 ? 'red' : 'green'} />
+                </div>
+              </Card>
+            </div>
+          )}
+        </section>
       </div>
+    </main>
+  );
+}
+
+function QuotesTable({ rows }: { rows: AdminStats['recentActivity']['quotes'] }) {
+  if (!rows.length) return <EmptyState>Nenhuma cotacao registrada ainda.</EmptyState>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[820px] text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
+            <th className="py-3 text-left">Data</th>
+            <th className="py-3 text-left">Rota</th>
+            <th className="py-3 text-right">Distancia</th>
+            <th className="py-3 text-right">Preco</th>
+            <th className="py-3 text-right">Custo</th>
+            <th className="py-3 text-right">Lucro</th>
+            <th className="py-3 text-right">Margem</th>
+            <th className="py-3 text-left">Tipo</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-100">
+          {rows.map((quote) => (
+            <tr key={quote.id} className="align-top">
+              <td className="whitespace-nowrap py-3 pr-4 text-xs font-bold text-zinc-400">{fmtDate(quote.createdAt)}</td>
+              <td className="max-w-[260px] py-3 pr-4">
+                <p className="truncate font-bold text-zinc-800">{quote.originAddress || '-'}</p>
+                <p className="truncate text-xs font-semibold text-zinc-400">para {quote.destinationAddress || '-'}</p>
+              </td>
+              <td className="whitespace-nowrap py-3 text-right font-bold text-zinc-600">{formatDistance(quote.distanceKm)}</td>
+              <td className="whitespace-nowrap py-3 text-right font-black text-emerald-700">{formatCurrencyBRL(quote.recommendedPrice)}</td>
+              <td className="whitespace-nowrap py-3 text-right font-bold text-rose-600">{formatCurrencyBRL(quote.totalCost)}</td>
+              <td className="whitespace-nowrap py-3 text-right font-bold text-sky-700">{formatCurrencyBRL(quote.profit)}</td>
+              <td className="whitespace-nowrap py-3 text-right font-bold text-zinc-700">{quote.margin.toFixed(1)}%</td>
+              <td className="whitespace-nowrap py-3 pl-4 font-semibold text-zinc-500">{TRIP_TYPE_LABEL[quote.tripType] || quote.tripType}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
