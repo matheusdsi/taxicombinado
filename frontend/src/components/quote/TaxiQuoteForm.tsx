@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -60,6 +60,17 @@ type FormValues = z.infer<typeof schema>;
 
 interface TaxiQuoteFormProps {
   onResult: (result: QuoteResult, quoteId: string, formValues: FormValues, steps: RouteStep[]) => void;
+}
+
+function pushAnalyticsEvent(event: string, params: Record<string, unknown> = {}) {
+  if (typeof window === 'undefined') return;
+
+  const analyticsWindow = window as typeof window & {
+    dataLayer?: Record<string, unknown>[];
+  };
+
+  analyticsWindow.dataLayer = analyticsWindow.dataLayer || [];
+  analyticsWindow.dataLayer.push({ event, ...params });
 }
 
 // ─── Segmented control ───────────────────────────────────────
@@ -122,6 +133,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMinutes: number; provider: string; steps: RouteStep[] } | null>(null);
   const [routeManualFallback, setRouteManualFallback] = useState(false);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formStartedRef = useRef(false);
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -164,6 +176,19 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       : routeInfo.durationMinutes
     : 0;
 
+  useEffect(() => {
+    const subscription = watch((_value, { name }) => {
+      if (!name || formStartedRef.current) return;
+
+      formStartedRef.current = true;
+      pushAnalyticsEvent('quote_form_started', {
+        first_field: name,
+      });
+    });
+
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
   const applyPreset = useCallback(
     (preset: 'comum' | 'luxo') => {
       const p = PRESETS[preset];
@@ -205,6 +230,15 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
     setApiError(null);
+    pushAnalyticsEvent('quote_calculate_attempt', {
+      trip_type: data.tripType,
+      route_mode: data.routeMode,
+      distance_km: data.distanceKm,
+      return_distance_km: data.returnDistanceKm ?? 0,
+      has_origin: Boolean(data.originAddress),
+      has_destination: Boolean(data.destinationAddress),
+    });
+
     try {
       const estimatedMinutes = routeInfo?.durationMinutes
         ? data.tripType === 'round_trip'
@@ -226,9 +260,23 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         desiredMarginPercent: data.desiredMarginPercent ?? 60,
         customChargedPrice: data.customChargedPrice && data.customChargedPrice > 0 ? data.customChargedPrice : undefined,
       });
+      pushAnalyticsEvent('quote_calculated', {
+        quote_id: response.quoteId,
+        trip_type: response.result.tripType,
+        route_mode: data.routeMode,
+        distance_km: response.result.distanceKm,
+        total_distance_km: response.result.totalDistanceKm,
+        recommended_price: response.result.recommendedPrice,
+        total_cost: response.result.totalCost,
+        margin: response.result.margin,
+      });
       onResult(response.result, response.quoteId, data, routeInfo?.steps ?? []);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
+      pushAnalyticsEvent('quote_calculate_error', {
+        trip_type: data.tripType,
+        route_mode: data.routeMode,
+      });
       setApiError(error?.response?.data?.error || 'Erro ao calcular. Verifique os dados e tente novamente.');
     } finally {
       setLoading(false);
