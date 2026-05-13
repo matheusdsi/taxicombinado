@@ -28,10 +28,10 @@ export function Header() {
                   Olá, {driver.name || driver.email.split('@')[0]}
                 </span>
                 <Link
-                  href="/historico"
+                  href="/minha-conta"
                   className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors"
                 >
-                  Histórico
+                  Minha conta
                 </Link>
                 <button
                   onClick={logout}

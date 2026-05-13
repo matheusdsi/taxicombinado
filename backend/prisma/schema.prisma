@@ -21,6 +21,10 @@ model User {
   taxiFareProfiles   TaxiFareProfile[]
   quotes             Quote[]
   anonymousSessions  AnonymousSession[]
+  driverProfile      DriverProfile?
+  driverMonthlyCost  DriverMonthlyCost?
+  maintenanceLogs    MaintenanceLog[]
+  fuelLogs           FuelLog[]
 
   @@map("users")
 }
@@ -44,9 +48,19 @@ model Vehicle {
   id                   String   @id @default(uuid())
   userId               String?  @map("user_id")
   name                 String
+  brand                String?
+  model                String?
+  year                 Int?
+  plateNickname        String?  @map("plate_nickname")
   fuelType             String   @default("gasoline") @map("fuel_type")
   consumptionKmPerLiter Float   @map("consumption_km_per_liter")
   extraCostPerKm       Float    @default(0) @map("extra_cost_per_km")
+  monthlyInstallment   Float?   @map("monthly_installment")
+  monthlyInsurance     Float?   @map("monthly_insurance")
+  monthlyProtection    Float?   @map("monthly_protection")
+  monthlyRental        Float?   @map("monthly_rental")
+  monthlyParking       Float?   @map("monthly_parking")
+  notes                String?
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -54,6 +68,93 @@ model Vehicle {
   quotes Quote[]
 
   @@map("vehicles")
+}
+
+model DriverProfile {
+  id                  String   @id @default(uuid())
+  userId              String   @unique @map("user_id")
+  phone               String?
+  whatsapp            String?
+  city                String?
+  state               String?
+  taxiPoint           String?  @map("taxi_point")
+  worksWithApps       Boolean? @map("works_with_apps")
+  acceptsPix          Boolean? @map("accepts_pix")
+  acceptsCard         Boolean? @map("accepts_card")
+  issuesReceipt       Boolean? @map("issues_receipt")
+  notes               String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("driver_profiles")
+}
+
+model DriverMonthlyCost {
+  id                     String   @id @default(uuid())
+  userId                 String   @unique @map("user_id")
+  personalIncomeGoal     Float?   @map("personal_income_goal")
+  workDaysPerMonth       Float?   @map("work_days_per_month")
+  hoursPerDay            Float?   @map("hours_per_day")
+  monthlyKmEstimate      Float?   @map("monthly_km_estimate")
+  fuelMonthlyEstimate    Float?   @map("fuel_monthly_estimate")
+  carInstallment         Float?   @map("car_installment")
+  carRental              Float?   @map("car_rental")
+  insurance              Float?
+  vehicleProtection      Float?   @map("vehicle_protection")
+  maintenanceReserve     Float?   @map("maintenance_reserve")
+  tireReserve            Float?   @map("tire_reserve")
+  oilReserve             Float?   @map("oil_reserve")
+  washing                Float?
+  parking                Float?
+  tollTag                Float?   @map("toll_tag")
+  phoneBill              Float?   @map("phone_bill")
+  appFees                Float?   @map("app_fees")
+  accountant             Float?
+  licenseAndTaxes        Float?   @map("license_and_taxes")
+  otherFixedCosts        Float?   @map("other_fixed_costs")
+  notes                  String?
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("driver_monthly_costs")
+}
+
+model MaintenanceLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  date        DateTime @default(now())
+  category    String?
+  description String
+  amount      Float
+  odometerKm  Float?   @map("odometer_km")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("maintenance_logs")
+}
+
+model FuelLog {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  date          DateTime @default(now())
+  fuelType      String   @default("gasoline") @map("fuel_type")
+  liters        Float?
+  totalPaid     Float    @map("total_paid")
+  pricePerLiter Float?   @map("price_per_liter")
+  odometerKm    Float?   @map("odometer_km")
+  station       String?
+  city          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("fuel_logs")
 }
 
 model TaxiFareProfile {

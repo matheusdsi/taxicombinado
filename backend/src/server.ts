@@ -9,6 +9,7 @@ import partnerRoutes from './routes/partner.routes';
 import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.routes';
 import placesRoutes from './routes/places.routes';
+import accountRoutes from './routes/account.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -78,6 +79,9 @@ app.use('/api/partners', partnerRoutes);
 
 // Auth (register/login/logout/me)
 app.use('/api/auth', authRoutes);
+
+// Driver account center
+app.use('/api/account', accountRoutes);
 
 // Admin
 app.use('/api/admin', adminRoutes);

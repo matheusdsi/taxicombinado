@@ -199,3 +199,44 @@ export async function submitFeedback(data: {
   const res = await api.post('/api/feedback', data);
   return res.data;
 }
+
+export interface DriverAccountData {
+  user: { id: string; name: string | null; email: string; phone?: string | null; createdAt: string } | null;
+  profile: Record<string, unknown> | null;
+  vehicle: Record<string, unknown> | null;
+  costs: Record<string, unknown> | null;
+  maintenanceLogs: Array<Record<string, unknown>>;
+  fuelLogs: Array<Record<string, unknown>>;
+  summary: {
+    monthlyCosts: number;
+    monthlyTarget: number;
+    dailyTarget: number | null;
+    hourlyTarget: number | null;
+    costPerKm: number | null;
+    targetPerKm: number | null;
+  };
+}
+
+export async function getDriverAccount(): Promise<DriverAccountData> {
+  const res = await api.get('/api/account');
+  return res.data.data;
+}
+
+export async function updateDriverAccount(data: {
+  profile?: Record<string, unknown>;
+  vehicle?: Record<string, unknown>;
+  costs?: Record<string, unknown>;
+}): Promise<DriverAccountData> {
+  const res = await api.put('/api/account', data);
+  return res.data.data;
+}
+
+export async function createMaintenanceLog(data: Record<string, unknown>) {
+  const res = await api.post('/api/account/maintenance', data);
+  return res.data.data;
+}
+
+export async function createFuelLog(data: Record<string, unknown>) {
+  const res = await api.post('/api/account/fuel-logs', data);
+  return res.data.data;
+}
