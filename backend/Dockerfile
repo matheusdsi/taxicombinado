@@ -10,7 +10,7 @@ RUN npm ci
 COPY . .
 
 RUN npx prisma generate
-RUN ./node_modules/.bin/tsc
+RUN npm run build
 
 EXPOSE 3001
 
