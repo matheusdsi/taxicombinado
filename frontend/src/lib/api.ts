@@ -180,6 +180,7 @@ export interface Partner {
   whatsapp?: string;
   city?: string;
   isPremium: boolean;
+  sortOrder: number;
   locations?: PartnerLocation[];
   _count?: { clicks: number };
 }
@@ -192,6 +193,7 @@ export interface PartnerLocation {
   phone?: string;
   whatsapp?: string;
   wazeUrl?: string;
+  sortOrder: number;
 }
 
 export async function getPartners(category?: string): Promise<Partner[]> {

@@ -30,6 +30,7 @@ router.get('/', async (req: Request, res: Response) => {
         whatsapp: true,
         city: true,
         isPremium: true,
+        sortOrder: true,
         locations: {
           where: { isActive: true },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -41,6 +42,7 @@ router.get('/', async (req: Request, res: Response) => {
             phone: true,
             whatsapp: true,
             wazeUrl: true,
+            sortOrder: true,
           },
         },
         _count: { select: { clicks: true } },

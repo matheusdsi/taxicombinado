@@ -37,6 +37,10 @@ function buildWhatsAppUrl(phone: string, partnerName: string) {
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 }
 
+function bySortOrder<T extends { sortOrder?: number; name: string }>(a: T, b: T) {
+  return (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, 'pt-BR');
+}
+
 export default function ParceirosPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +51,14 @@ export default function ParceirosPage() {
       setLoading(true);
       try {
         const data = await getPartners(selectedCategory || undefined);
-        setPartners(data);
+        setPartners(
+          [...data]
+            .sort(bySortOrder)
+            .map((partner) => ({
+              ...partner,
+              locations: partner.locations ? [...partner.locations].sort(bySortOrder) : [],
+            }))
+        );
       } catch {
         setPartners([]);
       } finally {
@@ -151,6 +162,12 @@ export default function ParceirosPage() {
       {!loading && partners.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {partners.map((partner) => (
+            (() => {
+              const locations = partner.locations ?? [];
+              const mainLocation = locations[0];
+              const otherLocations = locations.slice(1);
+
+              return (
             <div
               key={partner.id}
               className="tc-card"
@@ -183,26 +200,51 @@ export default function ParceirosPage() {
                 {partner.description && (
                   <p style={{ fontSize: 13, color: 'var(--gray-700)', fontWeight: 600, marginBottom: 10, lineHeight: 1.4 }}>{partner.description}</p>
                 )}
-                {partner.locations?.length ? (
+                {mainLocation ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {partner.websiteUrl && renderContactButtons(partner, partner, { showOffer: true })}
-                    {partner.locations.map((location) => (
-                      <div key={location.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 12, padding: 10, background: 'rgba(255,255,255,.72)' }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{location.name}</div>
-                        {(location.address || location.city) && (
-                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginTop: 2, marginBottom: 8 }}>
-                            {[location.address, location.city].filter(Boolean).join(' · ')}
-                          </div>
-                        )}
-                        {renderContactButtons(partner, location, { locationId: location.id })}
+                    <div style={{ border: '1px solid var(--gray-200)', borderRadius: 12, padding: 10, background: 'rgba(255,255,255,.72)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{mainLocation.name}</div>
+                        <span style={{ flexShrink: 0, borderRadius: 999, background: 'var(--yellow-soft)', color: 'var(--ink)', padding: '3px 7px', fontSize: 9, fontWeight: 900, letterSpacing: '.06em' }}>
+                          PRINCIPAL
+                        </span>
                       </div>
-                    ))}
+                      {(mainLocation.address || mainLocation.city) && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginTop: 2, marginBottom: 8 }}>
+                          {[mainLocation.address, mainLocation.city].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                      {renderContactButtons(partner, mainLocation, { locationId: mainLocation.id })}
+                    </div>
+                    {otherLocations.length > 0 && (
+                      <details style={{ border: '1px solid var(--gray-200)', borderRadius: 12, background: 'rgba(255,255,255,.72)', overflow: 'hidden' }}>
+                        <summary style={{ cursor: 'pointer', padding: '10px 12px', fontSize: 13, fontWeight: 800, color: 'var(--ink)', listStyle: 'none' }}>
+                          Outras unidades ({otherLocations.length})
+                        </summary>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 10px 10px' }}>
+                          {otherLocations.map((location) => (
+                            <div key={location.id} style={{ borderTop: '1px solid var(--gray-200)', paddingTop: 10 }}>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{location.name}</div>
+                              {(location.address || location.city) && (
+                                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginTop: 2, marginBottom: 8 }}>
+                                  {[location.address, location.city].filter(Boolean).join(' · ')}
+                                </div>
+                              )}
+                              {renderContactButtons(partner, location, { locationId: location.id })}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 ) : (
                   renderContactButtons(partner, partner, { showOffer: true })
                 )}
               </div>
             </div>
+              );
+            })()
           ))}
         </div>
       )}
