@@ -126,4 +126,3 @@ Aplicação full-stack para taxistas brasileiros calcularem tarifas, gerenciarem
 - **Google Maps:** autocomplete de endereços e cálculo de rotas
 - **Mapbox:** fallback para cálculo de rotas
 - **WhatsApp Web:** link gerado para contato direto no agendamento
- 
