@@ -11,8 +11,8 @@ import { AddressInput } from '@/components/ui/AddressInput';
 import { calculateQuote, calculateRoute, QuoteResult, RouteStep } from '@/lib/api';
 
 const PRESETS = {
-  comum: { baseFare: 6.55, pricePerKm: 4.8, waitingPrice: 55.5 / 60, waitingChargeType: 'per_minute' as const },
-  luxo: { baseFare: 9.83, pricePerKm: 7.2, waitingPrice: 83.25 / 60, waitingChargeType: 'per_minute' as const },
+  comum: { baseFare: 6.55, pricePerKm: 4.8, waitingPrice: 55.5, waitingChargeType: 'per_hour' as const },
+  luxo: { baseFare: 9.83, pricePerKm: 7.2, waitingPrice: 83.25, waitingChargeType: 'per_hour' as const },
 };
 
 const TRIP_TYPE_EXPLANATIONS = [
@@ -46,6 +46,8 @@ const schema = z.object({
   vehicleExtraCostPerKm: z.number().min(0),
   baseFare: z.number().min(0),
   pricePerKm: z.number().min(0),
+  hasWaiting: z.boolean(),
+  waitingHours: z.number().min(0).max(24),
   waitingPrice: z.number().min(0),
   waitingChargeType: z.enum(['per_minute', 'per_hour']),
   flagMultiplier: z.number().min(1).max(3),
@@ -55,6 +57,14 @@ const schema = z.object({
   extraCosts: z.number().min(0),
   desiredMarginPercent: z.number().min(0).max(80),
   customChargedPrice: z.number().min(0).optional(),
+}).superRefine((data, ctx) => {
+  if (data.tripType === 'round_trip' && data.hasWaiting && data.waitingHours <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe quantas horas de espera',
+      path: ['waitingHours'],
+    });
+  }
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -149,6 +159,8 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       vehicleExtraCostPerKm: 0.8,
       baseFare: PRESETS.comum.baseFare,
       pricePerKm: PRESETS.comum.pricePerKm,
+      hasWaiting: false,
+      waitingHours: 0,
       waitingPrice: Number(PRESETS.comum.waitingPrice.toFixed(4)),
       waitingChargeType: PRESETS.comum.waitingChargeType,
       flagMultiplier: 1.0,
@@ -166,6 +178,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const fuelType = watch('fuelType');
   const desiredMarginPercent = watch('desiredMarginPercent');
   const flagMultiplier = watch('flagMultiplier');
+  const hasWaiting = watch('hasWaiting');
   const isElectric = fuelType === 'electric';
   const routeTotalDistanceKm = routeInfo
     ? tripType === 'one_way'
@@ -190,6 +203,19 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
 
     return () => subscription.unsubscribe();
   }, [watch]);
+
+  useEffect(() => {
+    if (tripType !== 'round_trip') {
+      setValue('hasWaiting', false);
+      setValue('waitingHours', 0, { shouldValidate: true });
+    }
+  }, [tripType, setValue]);
+
+  useEffect(() => {
+    if (!hasWaiting) {
+      setValue('waitingHours', 0, { shouldValidate: true });
+    }
+  }, [hasWaiting, setValue]);
 
   const applyPreset = useCallback(
     (preset: 'comum' | 'luxo') => {
@@ -232,11 +258,15 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
     setApiError(null);
+    const estimatedWaitingMinutes = data.tripType === 'round_trip' && data.hasWaiting
+      ? Math.round(data.waitingHours * 60)
+      : 0;
     pushAnalyticsEvent('quote_calculate_attempt', {
       trip_type: data.tripType,
       route_mode: data.routeMode,
       distance_km: data.distanceKm,
       return_distance_km: data.returnDistanceKm ?? 0,
+      estimated_waiting_minutes: estimatedWaitingMinutes,
       has_origin: Boolean(data.originAddress),
       has_destination: Boolean(data.destinationAddress),
     });
@@ -244,7 +274,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     try {
       const response = await calculateQuote({
         ...data,
-        estimatedMinutes: 0,
+        estimatedMinutes: estimatedWaitingMinutes,
         vehicleExtraCostPerKm: data.vehicleExtraCostPerKm,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
@@ -530,13 +560,50 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
           <Controller name="pricePerKm" control={control} render={({ field }) => (
             <MoneyInput label="Valor por km" value={field.value} onChange={field.onChange} />
           )} />
-          <Controller name="waitingPrice" control={control} render={({ field }) => (
-            <MoneyInput label="Tempo parado/min" value={field.value} onChange={field.onChange} />
-          )} />
           <Controller name="desiredMarginPercent" control={control} render={({ field }) => (
             <NumberInput label="Margem desejada" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
           )} />
         </div>
+
+        {tripType === 'round_trip' && (
+          <div style={{ border: '1px solid var(--gray-200)', borderRadius: 12, padding: 12, background: 'var(--gray-50)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Controller name="hasWaiting" control={control} render={({ field }) => (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                  style={{ width: 18, height: 18, accentColor: 'var(--ink)', flexShrink: 0 }}
+                />
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>Vai precisar esperar?</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>A espera entra no valor apenas quando esta opção estiver marcada.</span>
+                </span>
+              </label>
+            )} />
+
+            {hasWaiting && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Controller name="waitingHours" control={control} render={({ field }) => (
+                  <NumberInput
+                    label="Tempo de espera"
+                    value={field.value}
+                    onChange={field.onChange}
+                    suffix="h"
+                    step={0.5}
+                    min={0}
+                    max={24}
+                    required
+                    error={errors.waitingHours?.message}
+                  />
+                )} />
+                <Controller name="waitingPrice" control={control} render={({ field }) => (
+                  <MoneyInput label="Valor da espera/hora" value={field.value} onChange={field.onChange} />
+                )} />
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4 }}>
