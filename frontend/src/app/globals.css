@@ -179,6 +179,18 @@ input[type=range]::-moz-range-thumb {
   font-weight: 800;
 }
 
+.pin-stop {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  background: var(--gray-200);
+  color: var(--gray-700);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .tc-seg {
   display: flex;
   background: var(--gray-100);

@@ -143,6 +143,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMinutes: number; provider: string; steps: RouteStep[] } | null>(null);
   const [routeManualFallback, setRouteManualFallback] = useState(false);
+  const [points, setPoints] = useState<string[]>(['', '']);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formStartedRef = useRef(false);
 
@@ -229,15 +230,16 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     [setValue]
   );
 
-  const fetchRoute = useCallback((origin: string, destination: string) => {
+  const fetchRoute = useCallback((origin: string, destination: string, wps: string[] = []) => {
     if (routeDebounce.current) clearTimeout(routeDebounce.current);
     setRouteInfo(null);
     setRouteManualFallback(false);
     if (origin.length < 4 || destination.length < 4) return;
+    const filledWaypoints = wps.filter((w) => w.length >= 4);
     routeDebounce.current = setTimeout(async () => {
       setRouteLoading(true);
       try {
-        const result = await calculateRoute(origin, destination);
+        const result = await calculateRoute(origin, destination, filledWaypoints.length ? filledWaypoints : undefined);
         if (result.distanceKm !== null && result.durationMinutes !== null) {
           setRouteInfo({ distanceKm: result.distanceKm, durationMinutes: result.durationMinutes, provider: result.provider, steps: result.steps ?? [] });
           setValue('distanceKm', result.distanceKm, { shouldValidate: true });
@@ -279,7 +281,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         vehicleExtraCostPerKm: 0,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
-        stops: [],
+        stops: points.slice(1, -1).filter((w) => w.trim()),
         tollOutbound: data.tollOutbound ?? 0,
         tollReturn: data.tollReturn ?? 0,
         parkingCost: data.parkingCost ?? 0,
@@ -334,34 +336,74 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       {/* ─── Rota ─── */}
       <Section title="Rota">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, position: 'relative' }}>
-          <Field label="Origem">
-            <Controller name="originAddress" control={control} render={({ field }) => (
-              <AddressInput
-                label=""
-                value={field.value ?? ''}
-                onChange={(v) => {
-                  field.onChange(v);
-                  fetchRoute(v, watch('destinationAddress') ?? '');
-                }}
-                placeholder="De onde sai"
-                prefix={<span className="pin-a">A</span>}
-              />
-            )} />
-          </Field>
-          <Field label="Destino">
-            <Controller name="destinationAddress" control={control} render={({ field }) => (
-              <AddressInput
-                label=""
-                value={field.value ?? ''}
-                onChange={(v) => {
-                  field.onChange(v);
-                  fetchRoute(watch('originAddress') ?? '', v);
-                }}
-                placeholder="Para onde vai"
-                prefix={<span className="pin-b">B</span>}
-              />
-            )} />
-          </Field>
+          {points.map((pt, i) => {
+            const isFirst = i === 0;
+            const isLast = i === points.length - 1;
+            const pinClass = isFirst ? 'pin-a' : isLast ? 'pin-b' : 'pin-stop';
+            const pinLabel = isFirst ? 'A' : isLast ? 'B' : String(i);
+            const fieldLabel = isFirst ? 'Origem' : isLast ? 'Destino' : `Parada ${i}`;
+            const placeholder = isFirst ? 'De onde sai' : isLast ? 'Para onde vai' : `Parada ${i}`;
+
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <Field label={fieldLabel}>
+                    <AddressInput
+                      label=""
+                      value={pt}
+                      onChange={(v) => {
+                        const next = [...points];
+                        next[i] = v;
+                        setPoints(next);
+                        if (isFirst) setValue('originAddress', v);
+                        if (isLast) setValue('destinationAddress', v);
+                        fetchRoute(
+                          isFirst ? v : next[0],
+                          isLast ? v : next[next.length - 1],
+                          next.slice(1, -1),
+                        );
+                      }}
+                      placeholder={placeholder}
+                      prefix={<span className={pinClass}>{pinLabel}</span>}
+                    />
+                  </Field>
+                </div>
+                {!isFirst && !isLast && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = points.filter((_, j) => j !== i);
+                      setPoints(next);
+                      fetchRoute(next[0], next[next.length - 1], next.slice(1, -1));
+                    }}
+                    style={{
+                      width: 36, height: 44, borderRadius: 10, border: '1.5px solid var(--gray-200)',
+                      background: 'var(--surface)', color: 'var(--gray-500)', fontSize: 18, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, display: 'grid', placeItems: 'center',
+                    }}
+                    aria-label="Remover parada"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {points.length < 7 && (
+            <button
+              type="button"
+              onClick={() => setPoints([...points.slice(0, -1), '', points[points.length - 1]])}
+              style={{
+                alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 10,
+                border: '1.5px dashed var(--gray-300)', background: 'transparent',
+                color: 'var(--gray-500)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                fontFamily: 'inherit', letterSpacing: '0.01em',
+              }}
+            >
+              + Adicionar parada
+            </button>
+          )}
         </div>
 
         <Controller name="tripType" control={control} render={({ field }) => (

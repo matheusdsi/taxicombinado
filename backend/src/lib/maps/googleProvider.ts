@@ -24,7 +24,13 @@ export class GoogleMapsProvider implements MapProvider {
       ? encodeURIComponent(request.destination)
       : `${request.destination.lat},${request.destination.lng}`;
 
-    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${this.apiKey}&language=pt-BR&region=BR&departure_time=now&traffic_model=best_guess`;
+    const waypointsParam = request.waypoints?.length
+      ? `&waypoints=${request.waypoints.map((w) =>
+          typeof w === 'string' ? encodeURIComponent(w) : `${w.lat},${w.lng}`
+        ).join('|')}`
+      : '';
+
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}${waypointsParam}&key=${this.apiKey}&language=pt-BR&region=BR&departure_time=now&traffic_model=best_guess`;
 
     const response = await fetch(url);
     const data = await response.json() as {
@@ -49,17 +55,23 @@ export class GoogleMapsProvider implements MapProvider {
     }
 
     const route = data.routes[0];
-    const leg = route.legs[0];
 
-    const steps: RouteStep[] = leg.steps.map((s) => ({
-      instruction: s.html_instructions.replace(/<[^>]+>/g, ''),
-      distanceKm: s.distance.value / 1000,
-      durationMinutes: s.duration.value / 60,
-    }));
+    const totalDistanceM = route.legs.reduce((sum, leg) => sum + leg.distance.value, 0);
+    const totalDurationS = route.legs.reduce(
+      (sum, leg) => sum + (leg.duration_in_traffic ?? leg.duration).value,
+      0
+    );
+    const steps: RouteStep[] = route.legs.flatMap((leg) =>
+      leg.steps.map((s) => ({
+        instruction: s.html_instructions.replace(/<[^>]+>/g, ''),
+        distanceKm: s.distance.value / 1000,
+        durationMinutes: s.duration.value / 60,
+      }))
+    );
 
     return {
-      distanceKm: leg.distance.value / 1000,
-      durationMinutes: (leg.duration_in_traffic ?? leg.duration).value / 60,
+      distanceKm: totalDistanceM / 1000,
+      durationMinutes: totalDurationS / 60,
       polyline: route.overview_polyline.points,
       provider: 'google',
       steps,

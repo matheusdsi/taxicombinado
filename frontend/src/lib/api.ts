@@ -115,13 +115,13 @@ export interface RouteStep {
   durationMinutes: number;
 }
 
-export async function calculateRoute(origin: string, destination: string): Promise<{
+export async function calculateRoute(origin: string, destination: string, waypoints?: string[]): Promise<{
   distanceKm: number | null;
   durationMinutes: number | null;
   provider: string;
   steps: RouteStep[];
 }> {
-  const res = await api.post('/api/route/calculate', { origin, destination });
+  const res = await api.post('/api/route/calculate', { origin, destination, waypoints });
   return res.data.data;
 }
 

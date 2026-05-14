@@ -4,6 +4,39 @@ import { useEffect, useState } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { getPartners, trackPartnerClick, Partner, PartnerLocation } from '@/lib/api';
 
+function PartnerThumb({ partner, initials }: { partner: Partner; initials: string }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (partner.logoUrl && !imgError) {
+    return (
+      <div style={{
+        width: 56, height: 56, flexShrink: 0, borderRadius: 14,
+        background: partner.isPremium ? 'var(--yellow)' : 'var(--gray-50)',
+        border: '1px solid var(--gray-100)',
+        display: 'grid', placeItems: 'center', overflow: 'hidden',
+      }}>
+        <img
+          src={partner.logoUrl}
+          alt={partner.name}
+          onError={() => setImgError(true)}
+          style={{ width: 40, height: 40, objectFit: 'contain' }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: 56, height: 56, flexShrink: 0, borderRadius: 14,
+      background: partner.isPremium ? 'var(--yellow)' : 'var(--gray-100)',
+      color: partner.isPremium ? 'var(--ink)' : 'var(--gray-700)',
+      display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 14,
+    }}>
+      {initials}
+    </div>
+  );
+}
+
 const categories = [
   { value: '', label: 'Todos' },
   { value: 'fuel_station', label: 'Postos' },
@@ -186,14 +219,10 @@ export default function ParceirosPage() {
               }}
             >
               {/* Thumb */}
-              <div style={{
-                width: 56, height: 56, flexShrink: 0, borderRadius: 14,
-                background: partner.isPremium ? 'var(--yellow)' : 'var(--gray-100)',
-                color: partner.isPremium ? 'var(--ink)' : 'var(--gray-700)',
-                display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 14,
-              }}>
-                {categoryInitials[normalizeCategoryKey(partner.category)] || partner.name.slice(0, 2).toUpperCase()}
-              </div>
+              <PartnerThumb
+                partner={partner}
+                initials={categoryInitials[normalizeCategoryKey(partner.category)] || partner.name.slice(0, 2).toUpperCase()}
+              />
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
