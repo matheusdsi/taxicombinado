@@ -258,7 +258,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
     setApiError(null);
-    const routeStoppedMinutes = Math.round((routeInfo?.durationMinutes ?? 0) * 0.30);
+    const routeStoppedMinutes = Math.round((routeInfo?.durationMinutes ?? 0) * 0.40);
     const estimatedWaitingMinutes = data.tripType === 'round_trip' && data.hasWaiting
       ? Math.round(data.waitingHours * 60)
       : routeStoppedMinutes;
