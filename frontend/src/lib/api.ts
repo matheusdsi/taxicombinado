@@ -243,6 +243,21 @@ export async function submitFeedback(data: {
   return res.data;
 }
 
+export async function submitContactMessage(data: {
+  name: string;
+  message: string;
+  type?: 'suggestion' | 'complaint';
+}) {
+  const label = data.type === 'complaint' ? 'Reclamação' : 'Sugestão';
+
+  return submitFeedback({
+    rating: 5,
+    category: `contact_${data.type ?? 'suggestion'}`,
+    page: '/contato',
+    message: `Tipo: ${label}\nNome: ${data.name}\nMensagem: ${data.message}`,
+  });
+}
+
 export interface DriverAccountData {
   user: { id: string; name: string | null; email: string; phone?: string | null; createdAt: string } | null;
   profile: Record<string, unknown> | null;
