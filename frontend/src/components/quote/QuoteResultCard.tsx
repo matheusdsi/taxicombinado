@@ -88,14 +88,14 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(17,24,39,.7)' }}>Preço recomendado</span>
           <span style={{ background: 'rgba(17,24,39,.1)', color: 'var(--ink)', padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>
-            Margem {Math.round(result.margin)}%
+            Lucro {Math.round(result.margin)}%
           </span>
         </div>
         <div className="tc-money-xl">
           R$ {rec.int}<span className="cents">,{rec.dec}</span>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(17,24,39,.65)', marginTop: 6 }}>
-          Com base nos custos informados e margem desejada.
+          Com base no taxímetro, no ganho escolhido e nos custos informados.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
@@ -193,9 +193,9 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
             { lab: 'Mínimo (não sai no prejuízo)',      val: result.minimumPrice,     color: 'var(--gray-500)', highlight: false },
-            { lab: 'Pela tarifa de táxi do município',  val: result.farePrice,        color: 'var(--gray-700)', highlight: false },
-            { lab: 'Recomendado',                       val: result.recommendedPrice, color: 'var(--ink)',      highlight: true },
-            { lab: 'Ideal (margem + reserva)',           val: result.idealPrice,       color: 'var(--green)',    highlight: false },
+            { lab: 'Taxímetro calculado',                val: result.farePrice,        color: 'var(--gray-700)', highlight: false },
+            { lab: 'Com ganho escolhido',                val: result.recommendedPrice, color: 'var(--ink)',      highlight: true },
+            { lab: 'Com reserva extra',                  val: result.idealPrice,       color: 'var(--green)',    highlight: false },
           ].map((p) => (
             <div key={p.lab} style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',

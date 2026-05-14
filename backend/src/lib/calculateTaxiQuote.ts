@@ -158,25 +158,16 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
   // Minimum price covers all costs plus driver minimum value
   const minimumPrice = totalCost + driverMinimumValue;
 
-  // Price with desired margin
+  // Price with desired gain over the calculated taximeter fare.
   const cappedMargin = Math.min(desiredMarginPercent, 80);
-  let priceWithMargin: number;
-  if (cappedMargin >= 100) {
-    priceWithMargin = minimumPrice;
-  } else if (cappedMargin > 0) {
-    priceWithMargin = totalCost / (1 - cappedMargin / 100);
-  } else {
-    priceWithMargin = totalCost;
-  }
+  const priceWithMargin = farePrice * (1 + cappedMargin / 100);
 
-  // Recommended price is the maximum of fare, margin-based price, and minimum
+  // Recommended price is the maximum of taximeter + gain and the minimum cost floor.
   const recommendedPrice = Math.max(farePrice, priceWithMargin, minimumPrice);
 
-  // Ideal price: same formula as recommended but with margin + 15pp (capped at 80%)
+  // Ideal price: same taximeter markup formula with +15pp reserve (capped at 80%).
   const idealMarginPercent = Math.min(cappedMargin + 15, 80);
-  const idealPriceByMargin = idealMarginPercent > 0
-    ? totalCost / (1 - idealMarginPercent / 100)
-    : totalCost;
+  const idealPriceByMargin = farePrice * (1 + idealMarginPercent / 100);
   const idealPrice = Math.max(idealPriceByMargin, recommendedPrice * 1.05);
 
   // ─── Outcome ─────────────────────────────────────────────────

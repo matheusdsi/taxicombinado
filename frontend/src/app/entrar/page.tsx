@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiUrl } from '@/lib/apiConfig';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/lib/api';
 
 export default function EntrarPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,18 +19,13 @@ export default function EntrarPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(apiUrl('/api/auth/driver/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Erro ao entrar');
+      await api.post('/api/auth/driver/login', { email, password });
+      await refresh();
       router.push('/historico');
       router.refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro desconhecido');
+      const error = e as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || error.message || 'Erro desconhecido');
     } finally {
       setLoading(false);
     }

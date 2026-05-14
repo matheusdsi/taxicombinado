@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiUrl } from '@/lib/apiConfig';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/lib/api';
 
 export default function CadastroPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,18 +32,13 @@ export default function CadastroPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(apiUrl('/api/auth/driver/register'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Erro ao criar conta');
+      await api.post('/api/auth/driver/register', { name: form.name, email: form.email, password: form.password });
+      await refresh();
       router.push('/historico');
       router.refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro desconhecido');
+      const error = e as { response?: { data?: { error?: string } }; message?: string };
+      setError(error.response?.data?.error || error.message || 'Erro desconhecido');
     } finally {
       setLoading(false);
     }

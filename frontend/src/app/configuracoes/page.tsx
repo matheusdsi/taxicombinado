@@ -186,9 +186,12 @@ export default function ConfiguracoesPage() {
         <div className="flex flex-col gap-3">
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium text-gray-700">Margem desejada</label>
+              <label className="text-sm font-medium text-gray-700">Ganho acima do taxímetro</label>
               <span className="text-sm font-bold text-taxi-600">{settings.desiredMarginPercent}%</span>
             </div>
+            <p className="mb-2 text-xs font-medium text-gray-500">
+              Percentual aplicado sobre o taxímetro calculado. Ex.: R$ 100 + 20% = R$ 120.
+            </p>
             <input
               type="range"
               min={0}

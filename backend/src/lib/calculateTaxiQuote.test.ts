@@ -46,6 +46,18 @@ describe('quote financial calculation', () => {
     assert.equal(result.margin, 78);
   });
 
+  it('applies desired percentage as gain over the calculated taximeter fare', () => {
+    const result = calculateTaxiQuote({
+      ...baseInput,
+      desiredMarginPercent: 20,
+    });
+
+    assert.equal(result.farePrice, 250);
+    assert.equal(result.priceWithMargin, 300);
+    assert.equal(result.recommendedPrice, 300);
+    assert.equal(result.profit, 245);
+  });
+
   it('uses the displayed rounded cost to calculate profit and margin', () => {
     const result = calculateTaxiQuote({
       ...baseInput,

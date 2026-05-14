@@ -168,7 +168,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       tollReturn: 0,
       parkingCost: 0,
       extraCosts: 0,
-      desiredMarginPercent: 60,
+      desiredMarginPercent: 20,
       customChargedPrice: undefined,
     },
   });
@@ -283,7 +283,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         tollReturn: data.tollReturn ?? 0,
         parkingCost: data.parkingCost ?? 0,
         extraCosts: data.extraCosts ?? 0,
-        desiredMarginPercent: data.desiredMarginPercent ?? 60,
+        desiredMarginPercent: data.desiredMarginPercent ?? 20,
         customChargedPrice: data.customChargedPrice && data.customChargedPrice > 0 ? data.customChargedPrice : undefined,
       });
       pushAnalyticsEvent('quote_calculated', {
@@ -499,8 +499,8 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         </div>
       </Section>
 
-      {/* ─── Tarifa e margem ─── */}
-      <Section title="Tarifa e margem">
+      {/* ─── Tarifa e ganho ─── */}
+      <Section title="Tarifa e ganho">
         {/* Presets SP */}
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', marginBottom: 8 }}>Tabela oficial SP:</div>
@@ -561,8 +561,12 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
             <MoneyInput label="Valor por km" value={field.value} onChange={field.onChange} />
           )} />
           <Controller name="desiredMarginPercent" control={control} render={({ field }) => (
-            <NumberInput label="Margem desejada" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
+            <NumberInput label="Ganho acima do taxímetro" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
           )} />
+        </div>
+
+        <div style={{ background: 'var(--blue-soft)', color: '#1E3A8A', borderRadius: 12, padding: '10px 12px', fontSize: 12, fontWeight: 700, lineHeight: 1.35 }}>
+          Esse percentual entra depois do valor do taxímetro. Ex.: taxímetro de R$ 100 + 20% = R$ 120, sempre respeitando seus custos mínimos.
         </div>
 
         {tripType === 'round_trip' && (

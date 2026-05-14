@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDriver(null);
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(); }, [pathname, refresh]);
 
   return (
     <AuthContext.Provider value={{ driver, loading, refresh, logout }}>
