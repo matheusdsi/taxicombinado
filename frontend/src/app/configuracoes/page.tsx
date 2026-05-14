@@ -29,7 +29,7 @@ const defaultSettings: DriverSettings = {
   baseFare: 6.55,
   pricePerKm: 4.8,
   waitingPricePerMinute: Number((55.5 / 60).toFixed(4)),
-  desiredMarginPercent: 20,
+  desiredMarginPercent: 0,
   driverMinimumValue: 0,
 };
 

@@ -168,7 +168,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       tollReturn: 0,
       parkingCost: 0,
       extraCosts: 0,
-      desiredMarginPercent: 20,
+      desiredMarginPercent: 0,
       customChargedPrice: undefined,
     },
   });
@@ -283,7 +283,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         tollReturn: data.tollReturn ?? 0,
         parkingCost: data.parkingCost ?? 0,
         extraCosts: data.extraCosts ?? 0,
-        desiredMarginPercent: data.desiredMarginPercent ?? 20,
+        desiredMarginPercent: data.desiredMarginPercent ?? 0,
         customChargedPrice: data.customChargedPrice && data.customChargedPrice > 0 ? data.customChargedPrice : undefined,
       });
       pushAnalyticsEvent('quote_calculated', {
