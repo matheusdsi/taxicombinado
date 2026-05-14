@@ -239,12 +239,9 @@ router.get('/history', async (req: Request, res: Response) => {
 router.get('/popular', async (_req: Request, res: Response) => {
   try {
     const popular = await prisma.quote.groupBy({
-      by: ['originAddress', 'destinationAddress'],
+      by: ['destinationAddress'],
       _count: { id: true },
-      where: {
-        originAddress: { not: null },
-        destinationAddress: { not: null },
-      },
+      where: { destinationAddress: { not: null } },
       orderBy: { _count: { id: 'desc' } },
       take: 10,
     });
@@ -252,7 +249,7 @@ router.get('/popular', async (_req: Request, res: Response) => {
     return res.json({
       success: true,
       data: popular.map((r) => ({
-        origin: r.originAddress,
+        origin: null,
         destination: r.destinationAddress,
         count: r._count.id,
       })),

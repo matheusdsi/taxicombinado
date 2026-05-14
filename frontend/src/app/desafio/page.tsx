@@ -341,11 +341,11 @@ export default function DesafioPage() {
         </>
       )}
 
-      {/* Popular routes */}
+      {/* Top destinos */}
       {popular.length > 0 && (
         <div style={{ marginTop: 8 }}>
           <p style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
-            📊 Rotas mais calculadas
+            📍 Top destinos
           </p>
           <div style={{ background: 'var(--surface)', border: '1.5px solid var(--gray-200)', borderRadius: 20, overflow: 'hidden' }}>
             {popular.map((route, i) => (
@@ -367,7 +367,7 @@ export default function DesafioPage() {
                     margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--ink)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
-                    {shortAddr(route.origin ?? '')} → {shortAddr(route.destination ?? '')}
+                    {shortAddr(route.destination ?? '')}
                   </p>
                   <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--gray-500)' }}>
                     {route.count} {route.count === 1 ? 'cálculo' : 'cálculos'}
