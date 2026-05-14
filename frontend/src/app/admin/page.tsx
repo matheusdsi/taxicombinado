@@ -147,6 +147,16 @@ interface PartnerLocationFormState {
   sortOrder: string;
 }
 
+type AdminPartnerPatch = Partial<Pick<
+  AdminPartner,
+  'name' | 'category' | 'description' | 'logoUrl' | 'websiteUrl' | 'wazeUrl' | 'phone' | 'whatsapp' | 'city' | 'isActive' | 'isPremium' | 'sortOrder'
+>>;
+
+type AdminPartnerLocationPatch = Partial<Pick<
+  AdminPartnerLocation,
+  'name' | 'address' | 'city' | 'phone' | 'whatsapp' | 'wazeUrl' | 'isActive' | 'sortOrder'
+>>;
+
 type TabId = 'master' | 'quotes' | 'audience' | 'partners' | 'feedback' | 'system';
 
 const TRIP_TYPE_LABEL: Record<string, string> = {
@@ -462,7 +472,26 @@ export default function AdminPage() {
     }
   }
 
-  async function updatePartner(partnerId: string, patch: Partial<Pick<AdminPartner, 'isActive' | 'isPremium'>>) {
+  function updatePartnerDraft(partnerId: string, patch: AdminPartnerPatch) {
+    setAdminPartners((current) => current.map((partner) => (
+      partner.id === partnerId ? { ...partner, ...patch } : partner
+    )));
+  }
+
+  function updatePartnerLocationDraft(partnerId: string, locationId: string, patch: AdminPartnerLocationPatch) {
+    setAdminPartners((current) => current.map((partner) => {
+      if (partner.id !== partnerId) return partner;
+
+      return {
+        ...partner,
+        locations: partner.locations.map((location) => (
+          location.id === locationId ? { ...location, ...patch } : location
+        )),
+      };
+    }));
+  }
+
+  async function updatePartner(partnerId: string, patch: AdminPartnerPatch) {
     setError('');
     try {
       const res = await fetch(apiUrl(`/api/admin/partners/${partnerId}`), {
@@ -473,7 +502,7 @@ export default function AdminPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Erro ao atualizar parceiro');
-      setAdminPartners((current) => current.map((partner) => (partner.id === partnerId ? json.data : partner)));
+      await fetchAdminPartners();
       await fetchStats();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao atualizar parceiro');
@@ -503,7 +532,7 @@ export default function AdminPage() {
     }
   }
 
-  async function updatePartnerLocation(locationId: string, patch: Partial<Pick<AdminPartnerLocation, 'isActive'>>) {
+  async function updatePartnerLocation(locationId: string, patch: AdminPartnerLocationPatch) {
     setError('');
     try {
       const res = await fetch(apiUrl(`/api/admin/partner-locations/${locationId}`), {
@@ -964,6 +993,18 @@ export default function AdminPage() {
                               {partner.city ? ` · ${partner.city}` : ''}
                             </p>
                             {partner.description && <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-zinc-600">{partner.description}</p>}
+                            <div className="mt-3 grid gap-2 md:grid-cols-3">
+                              <input value={partner.name} onChange={(event) => updatePartnerDraft(partner.id, { name: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Nome" />
+                              <input value={partner.category} onChange={(event) => updatePartnerDraft(partner.id, { category: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Categoria" />
+                              <input value={partner.city ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { city: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Cidade" />
+                              <input value={partner.phone ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { phone: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Telefone" />
+                              <input value={partner.whatsapp ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { whatsapp: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="WhatsApp" />
+                              <input type="number" value={partner.sortOrder} onChange={(event) => updatePartnerDraft(partner.id, { sortOrder: Number(event.target.value || 0) })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Ordem" />
+                              <input type="url" value={partner.websiteUrl ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { websiteUrl: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Site" />
+                              <input type="url" value={partner.wazeUrl ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { wazeUrl: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Waze" />
+                              <input type="url" value={partner.logoUrl ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { logoUrl: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Logo URL" />
+                            </div>
+                            <textarea value={partner.description ?? ''} onChange={(event) => updatePartnerDraft(partner.id, { description: event.target.value })} className="mt-2 min-h-[72px] w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Descricao" />
                             <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-zinc-400">
                               <span>{partner._count.clicks} cliques</span>
                               <span>{partner._count.leads} leads</span>
@@ -986,6 +1027,25 @@ export default function AdminPage() {
                             </div>
                           </div>
                           <div className="flex shrink-0 flex-wrap gap-2">
+                            <button
+                              onClick={() => updatePartner(partner.id, {
+                                name: partner.name,
+                                category: partner.category,
+                                description: partner.description ?? '',
+                                logoUrl: partner.logoUrl ?? '',
+                                websiteUrl: partner.websiteUrl ?? '',
+                                wazeUrl: partner.wazeUrl ?? '',
+                                phone: partner.phone ?? '',
+                                whatsapp: partner.whatsapp ?? '',
+                                city: partner.city ?? '',
+                                isActive: partner.isActive,
+                                isPremium: partner.isPremium,
+                                sortOrder: partner.sortOrder,
+                              })}
+                              className="rounded-lg bg-zinc-950 px-3 py-2 text-xs font-black text-white hover:bg-zinc-800"
+                            >
+                              Salvar dados
+                            </button>
                             <button
                               onClick={() => updatePartner(partner.id, { isPremium: !partner.isPremium })}
                               className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-black text-zinc-700 hover:bg-zinc-50"
@@ -1022,6 +1082,18 @@ export default function AdminPage() {
                                       <p className="mt-1 text-xs font-semibold text-zinc-500">
                                         {[location.address, location.city].filter(Boolean).join(' · ') || 'Sem endereco'}
                                       </p>
+                                      <div className="mt-2 grid gap-2 md:grid-cols-3">
+                                        <input value={location.name} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { name: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Nome da unidade" />
+                                        <input value={location.address ?? ''} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { address: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Endereco" />
+                                        <input value={location.city ?? ''} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { city: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Cidade" />
+                                        <input value={location.phone ?? ''} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { phone: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="Telefone" />
+                                        <input value={location.whatsapp ?? ''} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { whatsapp: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="WhatsApp" />
+                                        <label className="grid gap-1">
+                                          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">Ordem da unidade</span>
+                                          <input type="number" value={location.sortOrder} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { sortOrder: Number(event.target.value || 0) })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950" placeholder="0" />
+                                        </label>
+                                        <input type="url" value={location.wazeUrl ?? ''} onChange={(event) => updatePartnerLocationDraft(partner.id, location.id, { wazeUrl: event.target.value })} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950 md:col-span-3" placeholder="Link do Waze" />
+                                      </div>
                                       <div className="mt-2 flex flex-wrap gap-3 text-[11px] font-bold text-zinc-400">
                                         <span>{location._count.clicks} cliques</span>
                                         <span>Waze {locationClickSourceCount(location, 'partners_page_waze')}</span>
@@ -1032,14 +1104,31 @@ export default function AdminPage() {
                                         {location.wazeUrl && <a className="text-sky-700" href={location.wazeUrl} target="_blank" rel="noreferrer">Abrir Waze</a>}
                                       </div>
                                     </div>
-                                    <button
-                                      onClick={() => updatePartnerLocation(location.id, { isActive: !location.isActive })}
-                                      className={`rounded-lg px-3 py-2 text-xs font-black ${
-                                        location.isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                      }`}
-                                    >
-                                      {location.isActive ? 'Desativar' : 'Ativar'}
-                                    </button>
+                                    <div className="flex shrink-0 flex-wrap gap-2">
+                                      <button
+                                        onClick={() => updatePartnerLocation(location.id, {
+                                          name: location.name,
+                                          address: location.address ?? '',
+                                          city: location.city ?? '',
+                                          phone: location.phone ?? '',
+                                          whatsapp: location.whatsapp ?? '',
+                                          wazeUrl: location.wazeUrl ?? '',
+                                          isActive: location.isActive,
+                                          sortOrder: location.sortOrder,
+                                        })}
+                                        className="rounded-lg bg-zinc-950 px-3 py-2 text-xs font-black text-white hover:bg-zinc-800"
+                                      >
+                                        Salvar unidade
+                                      </button>
+                                      <button
+                                        onClick={() => updatePartnerLocation(location.id, { isActive: !location.isActive })}
+                                        className={`rounded-lg px-3 py-2 text-xs font-black ${
+                                          location.isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        }`}
+                                      >
+                                        {location.isActive ? 'Desativar' : 'Ativar'}
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               ))}
@@ -1088,7 +1177,7 @@ export default function AdminPage() {
                             </div>
                             <div className="flex items-center justify-between gap-2">
                               <label className="flex items-center gap-2 text-xs font-black text-zinc-600">
-                                Ordem
+                                Ordem da unidade
                                 <input
                                   type="number"
                                   value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).sortOrder}

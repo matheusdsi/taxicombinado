@@ -387,11 +387,11 @@ router.post('/settings', (req: Request, res: Response) => {
 router.get('/partners', async (_req: Request, res: Response) => {
   try {
     const partners = await prisma.partner.findMany({
-      orderBy: [{ isActive: 'desc' }, { isPremium: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { isPremium: 'desc' }, { name: 'asc' }],
       include: {
         _count: { select: { clicks: true, leads: true } },
         locations: {
-          orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+          orderBy: [{ sortOrder: 'asc' }, { isActive: 'desc' }, { name: 'asc' }],
           include: {
             _count: { select: { clicks: true } },
           },

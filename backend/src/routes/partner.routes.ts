@@ -17,7 +17,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const partners = await prisma.partner.findMany({
       where,
-      orderBy: [{ isPremium: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      orderBy: [{ sortOrder: 'asc' }, { isPremium: 'desc' }, { name: 'asc' }],
       select: {
         id: true,
         name: true,
