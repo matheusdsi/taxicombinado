@@ -475,7 +475,6 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
               ]} />
               <Seg value={field.value} onChange={field.onChange} options={[
                 { value: 'diesel', label: 'Diesel' },
-                { value: 'flex', label: 'Flex' },
                 { value: 'electric', label: 'Elétrico' },
               ]} />
             </div>
