@@ -24,7 +24,7 @@ export class GoogleMapsProvider implements MapProvider {
       ? encodeURIComponent(request.destination)
       : `${request.destination.lat},${request.destination.lng}`;
 
-    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${this.apiKey}&language=pt-BR&region=BR`;
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${this.apiKey}&language=pt-BR&region=BR&departure_time=now&traffic_model=best_guess`;
 
     const response = await fetch(url);
     const data = await response.json() as {
@@ -33,6 +33,7 @@ export class GoogleMapsProvider implements MapProvider {
         legs: Array<{
           distance: { value: number };
           duration: { value: number };
+          duration_in_traffic?: { value: number };
           steps: Array<{
             html_instructions: string;
             distance: { value: number };
@@ -58,7 +59,7 @@ export class GoogleMapsProvider implements MapProvider {
 
     return {
       distanceKm: leg.distance.value / 1000,
-      durationMinutes: leg.duration.value / 60,
+      durationMinutes: (leg.duration_in_traffic ?? leg.duration).value / 60,
       polyline: route.overview_polyline.points,
       provider: 'google',
       steps,
