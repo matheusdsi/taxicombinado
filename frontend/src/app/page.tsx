@@ -11,6 +11,7 @@ import { saveLocalQuote } from '@/lib/localQuotes';
 interface FormSnapshot {
   originAddress?: string;
   destinationAddress?: string;
+  stops?: string[];
 }
 
 export default function HomePage() {
@@ -20,13 +21,14 @@ export default function HomePage() {
   const [routeSteps, setRouteSteps] = useState<RouteStep[]>([]);
   const resultRef = useRef<HTMLDivElement>(null);
 
-  const handleResult = (res: QuoteResult, id: string, formValues: FormSnapshot, steps: RouteStep[]) => {
+  const handleResult = (res: QuoteResult, id: string, formValues: FormSnapshot, steps: RouteStep[], stops: string[]) => {
     setResult(res);
     setQuoteId(id);
     setRouteSteps(steps);
     setFormSnapshot({
       originAddress: formValues.originAddress,
       destinationAddress: formValues.destinationAddress,
+      stops,
     });
     saveLocalQuote({
       id,
@@ -77,6 +79,7 @@ export default function HomePage() {
             quoteId={quoteId}
             originAddress={formSnapshot.originAddress}
             destinationAddress={formSnapshot.destinationAddress}
+            stops={formSnapshot.stops}
             routeSteps={routeSteps}
             onNewQuote={handleNewQuote}
           />

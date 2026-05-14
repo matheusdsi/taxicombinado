@@ -70,7 +70,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 interface TaxiQuoteFormProps {
-  onResult: (result: QuoteResult, quoteId: string, formValues: FormValues, steps: RouteStep[]) => void;
+  onResult: (result: QuoteResult, quoteId: string, formValues: FormValues, steps: RouteStep[], stops: string[]) => void;
 }
 
 function pushAnalyticsEvent(event: string, params: Record<string, unknown> = {}) {
@@ -299,7 +299,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         total_cost: response.result.totalCost,
         margin: response.result.margin,
       });
-      onResult(response.result, response.quoteId, data, routeInfo?.steps ?? []);
+      onResult(response.result, response.quoteId, data, routeInfo?.steps ?? [], points.slice(1, -1).filter((w) => w.trim()));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
       pushAnalyticsEvent('quote_calculate_error', {
@@ -449,6 +449,11 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
               <div>
                 <span style={{ fontSize: 14, fontWeight: 800, color: '#14532D' }}>{routeTotalDistanceKm.toFixed(1)} km</span>
                 <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}> · {Math.round(routeTotalMinutes)} min estimados</span>
+                {points.slice(1, -1).filter((w) => w.trim()).length > 0 && (
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--green)', fontWeight: 600, marginTop: 2 }}>
+                    Via: {points.slice(1, -1).filter((w) => w.trim()).join(' · ')}
+                  </span>
+                )}
                 {tripType !== 'one_way' && (
                   <span style={{ display: 'block', fontSize: 11, color: 'var(--green)', fontWeight: 600, marginTop: 2 }}>
                     Ida {routeInfo.distanceKm.toFixed(1)} km + volta {(returnDistanceKm || routeInfo.distanceKm).toFixed(1)} km

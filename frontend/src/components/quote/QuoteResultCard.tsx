@@ -9,6 +9,7 @@ interface QuoteResultCardProps {
   quoteId: string;
   originAddress?: string;
   destinationAddress?: string;
+  stops?: string[];
   routeSteps?: RouteStep[];
   onNewQuote: () => void;
 }
@@ -44,7 +45,7 @@ function MoneyLine({ label, value, tone }: { label: string; value: number; tone?
   );
 }
 
-export function QuoteResultCard({ result, quoteId, originAddress, destinationAddress, routeSteps = [], onNewQuote }: QuoteResultCardProps) {
+export function QuoteResultCard({ result, quoteId, originAddress, destinationAddress, stops = [], routeSteps = [], onNewQuote }: QuoteResultCardProps) {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
@@ -61,6 +62,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       '🚖 Orçamento Taxi Combinado',
       '',
       originAddress      && `📍 Origem: ${originAddress}`,
+      ...stops.map((s, i) => `📌 Parada ${i + 1}: ${s}`),
       destinationAddress && `🏁 Destino: ${destinationAddress}`,
       `🗺️ Distância: ${formatDistance(result.distanceKm)}`,
       '',
@@ -104,7 +106,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
           R$ {rec.int}<span className="cents">,{rec.dec}</span>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(17,24,39,.65)', marginTop: 6 }}>
-          Com base no taxímetro estimado (inclui ~30% do tempo de rota como parado em trânsito/semáforos), no ganho escolhido e nos custos informados.
+          Com base no taxímetro estimado, incluindo tempo parado em trânsito, no ganho escolhido e nos custos informados.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
@@ -175,19 +177,31 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       {(originAddress || destinationAddress) && (
         <div className="tc-card">
           <div className="tc-section-title">Resumo da rota</div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 2 }}>
-              <span className="pin-a">A</span>
-              <span style={{ width: 1.5, flex: 1, background: 'var(--gray-200)', margin: '4px 0', minHeight: 24, display: 'block' }}/>
-              <span className="pin-b">B</span>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{originAddress || '—'}</div>
-              <div style={{ fontSize: 12, color: 'var(--gray-500)', margin: '4px 0 16px' }}>Saída</div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{destinationAddress || '—'}</div>
-              <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>Destino</div>
-            </div>
-          </div>
+          {(() => {
+            const allPoints = [
+              { pinClass: 'pin-a', label: 'A', address: originAddress || '—', sublabel: 'Saída' },
+              ...stops.map((s, i) => ({ pinClass: 'pin-stop', label: String(i + 1), address: s, sublabel: `Parada ${i + 1}` })),
+              { pinClass: 'pin-b', label: 'B', address: destinationAddress || '—', sublabel: 'Destino' },
+            ];
+            return (
+              <div>
+                {allPoints.map((pt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 2 }}>
+                      <span className={pt.pinClass}>{pt.label}</span>
+                      {i < allPoints.length - 1 && (
+                        <span style={{ width: 1.5, flex: 1, minHeight: 20, background: 'var(--gray-200)', margin: '4px 0', display: 'block' }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, paddingBottom: i < allPoints.length - 1 ? 10 : 0, paddingTop: 2 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{pt.address}</div>
+                      <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 2 }}>{pt.sublabel}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div style={{ height: 1, background: 'var(--gray-200)', margin: '14px 0' }}/>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
             {[
@@ -205,27 +219,33 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       )}
 
       {/* ─── Faixas de preço ─── */}
-      <div className="tc-card">
-        <div className="tc-section-title">Faixas de preço</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[
-            { lab: 'Mínimo (não sai no prejuízo)',      val: result.minimumPrice,     color: 'var(--gray-500)', highlight: false },
-            { lab: 'Taxímetro calculado',                val: result.farePrice,        color: 'var(--gray-700)', highlight: false },
-            { lab: 'Com ganho escolhido',                val: result.recommendedPrice, color: 'var(--ink)',      highlight: true },
-            { lab: 'Com reserva extra',                  val: result.idealPrice,       color: 'var(--green)',    highlight: false },
-          ].map((p) => (
-            <div key={p.lab} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: p.highlight ? '10px 12px' : '7px 4px',
-              background: p.highlight ? 'var(--yellow-soft)' : 'transparent',
-              borderRadius: p.highlight ? 10 : 0,
-            }}>
-              <span style={{ fontSize: 13, color: p.color, fontWeight: p.highlight ? 800 : 600 }}>{p.lab}</span>
-              <span style={{ fontWeight: 800, fontSize: 15, color: p.color }}>{formatCurrencyBRL(p.val)}</span>
+      {(() => {
+        const hasMargin = result.priceWithMargin > result.farePrice + 0.01;
+        const bands = [
+          { lab: 'Mínimo — cobre seus custos', val: result.minimumPrice, color: 'var(--gray-500)', highlight: false },
+          { lab: 'Taxímetro estimado',          val: result.farePrice,   color: 'var(--gray-700)', highlight: !hasMargin },
+          ...(hasMargin ? [{ lab: 'Com o ganho que você escolheu', val: result.recommendedPrice, color: 'var(--ink)', highlight: true }] : []),
+          { lab: 'Você pode cobrar mais — até', val: result.idealPrice,  color: 'var(--green)',    highlight: false },
+        ];
+        return (
+          <div className="tc-card">
+            <div className="tc-section-title">Faixas de preço</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {bands.map((p) => (
+                <div key={p.lab} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: p.highlight ? '10px 12px' : '7px 4px',
+                  background: p.highlight ? 'var(--yellow-soft)' : 'transparent',
+                  borderRadius: p.highlight ? 10 : 0,
+                }}>
+                  <span style={{ fontSize: 13, color: p.color, fontWeight: p.highlight ? 800 : 600 }}>{p.lab}</span>
+                  <span style={{ fontWeight: 800, fontSize: 15, color: p.color }}>{formatCurrencyBRL(p.val)}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        );
+      })()}
 
       {/* ─── Detalhamento de custos ─── */}
       <div className="tc-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -245,7 +265,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
               {result.tollTotal > 0    && <CostRow label="Pedágio"         value={result.tollTotal} />}
               {result.parkingCost > 0  && <CostRow label="Estacionamento"   value={result.parkingCost} />}
               {result.extraCosts > 0   && <CostRow label="Outros gastos"     value={result.extraCosts} />}
-              {result.timeCharge > 0   && <CostRow label="Espera cobrada do cliente" value={result.timeCharge} />}
+              {result.timeCharge > 0   && <CostRow label="Tempo no taxímetro (trânsito/espera)" value={result.timeCharge} />}
               <div style={{ height: 1, background: 'var(--gray-200)', margin: '8px 0' }}/>
               <CostRow label="Total que sai do seu bolso" value={result.totalCost} bold />
             </div>
