@@ -132,7 +132,7 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
             <DetailLine label="Taximetro calculado" value={taximeter > 0 ? formatCurrencyBRL(taximeter) : 'Nao informado'} />
             <DetailLine label="Ganho colocado em cima" value={gainOverTaximeter > 0 ? formatCurrencyBRL(gainOverTaximeter) : 'Sem acrescimo'} />
             <DetailLine label="Minimo para nao pagar pra trabalhar" value={quote.minimumPrice ? formatCurrencyBRL(quote.minimumPrice) : formatCurrencyBRL(quote.totalCost)} />
-            {quote.idealPrice && <DetailLine label="Com folga melhor" value={formatCurrencyBRL(quote.idealPrice)} />}
+            {Number(quote.idealPrice) > 0 && <DetailLine label="Com folga melhor" value={formatCurrencyBRL(Number(quote.idealPrice))} />}
           </div>
 
           <div className="tc-card" style={{ margin: 0 }}>
@@ -142,17 +142,17 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
             )) : (
               <p style={{ fontSize: 13, color: 'var(--gray-500)', fontWeight: 700 }}>Essa cotacao antiga nao guardou a abertura dos custos.</p>
             )}
-            {quote.timeCharge && quote.timeCharge > 0 && <DetailLine label="Espera/parado cobrada" value={formatCurrencyBRL(quote.timeCharge)} />}
+            {Number(quote.timeCharge) > 0 && <DetailLine label="Espera/parado cobrada" value={formatCurrencyBRL(Number(quote.timeCharge))} />}
             <DetailLine label="Gasto total estimado" value={formatCurrencyBRL(quote.totalCost)} strong />
           </div>
 
           <div className="tc-card" style={{ margin: 0 }}>
             <div className="tc-section-title">Dados usados</div>
             <DetailLine label="Distancia total" value={formatDistance(totalDistance)} />
-            {quote.returnDistanceKm && quote.returnDistanceKm > 0 && <DetailLine label="Volta considerada" value={formatDistance(quote.returnDistanceKm)} />}
-            {quote.estimatedMinutes && quote.estimatedMinutes > 0 && <DetailLine label="Tempo de espera" value={`${Math.round(quote.estimatedMinutes / 60 * 10) / 10} h`} />}
-            {quote.fuelPricePerLiter && quote.fuelPricePerLiter > 0 && <DetailLine label="Combustivel informado" value={formatCurrencyBRL(quote.fuelPricePerLiter)} />}
-            {quote.consumptionKmPerLiter && quote.consumptionKmPerLiter > 0 && <DetailLine label="Consumo do carro" value={`${quote.consumptionKmPerLiter} km/l`} />}
+            {Number(quote.returnDistanceKm) > 0 && <DetailLine label="Volta considerada" value={formatDistance(Number(quote.returnDistanceKm))} />}
+            {Number(quote.estimatedMinutes) > 0 && <DetailLine label="Tempo de espera" value={`${Math.round(Number(quote.estimatedMinutes) / 60 * 10) / 10} h`} />}
+            {Number(quote.fuelPricePerLiter) > 0 && <DetailLine label="Combustivel informado" value={formatCurrencyBRL(Number(quote.fuelPricePerLiter))} />}
+            {Number(quote.consumptionKmPerLiter) > 0 && <DetailLine label="Consumo do carro" value={`${Number(quote.consumptionKmPerLiter)} km/l`} />}
           </div>
 
           {quote.alerts && quote.alerts.length > 0 && (
