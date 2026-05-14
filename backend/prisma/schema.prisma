@@ -276,7 +276,9 @@ model Partner {
   description String?
   logoUrl     String?  @map("logo_url")
   websiteUrl  String?  @map("website_url")
+  wazeUrl     String?  @map("waze_url")
   phone       String?
+  whatsapp    String?
   city        String?
   isActive    Boolean  @default(true) @map("is_active")
   isPremium   Boolean  @default(false) @map("is_premium")
@@ -286,18 +288,41 @@ model Partner {
 
   clicks PartnerClick[]
   leads  PartnerLead[]
+  locations PartnerLocation[]
 
   @@map("partners")
+}
+
+model PartnerLocation {
+  id        String   @id @default(uuid())
+  partnerId String   @map("partner_id")
+  name      String
+  address   String?
+  city      String?
+  phone     String?
+  whatsapp  String?
+  wazeUrl   String?  @map("waze_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  clicks  PartnerClick[]
+
+  @@map("partner_locations")
 }
 
 model PartnerClick {
   id          String   @id @default(uuid())
   partnerId   String   @map("partner_id")
+  partnerLocationId String? @map("partner_location_id")
   anonymousId String?  @map("anonymous_id")
   source      String?
   createdAt   DateTime @default(now()) @map("created_at")
 
   partner Partner @relation(fields: [partnerId], references: [id])
+  partnerLocation PartnerLocation? @relation(fields: [partnerLocationId], references: [id])
 
   @@map("partner_clicks")
 }

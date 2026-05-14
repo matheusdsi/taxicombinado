@@ -96,12 +96,30 @@ interface AdminPartner {
   description?: string | null;
   logoUrl?: string | null;
   websiteUrl?: string | null;
+  wazeUrl?: string | null;
   phone?: string | null;
+  whatsapp?: string | null;
   city?: string | null;
   isActive: boolean;
   isPremium: boolean;
   sortOrder: number;
   _count: { clicks: number; leads: number };
+  clickSources?: Record<string, number>;
+  locations: AdminPartnerLocation[];
+}
+
+interface AdminPartnerLocation {
+  id: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  wazeUrl?: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  _count: { clicks: number };
+  clickSources?: Record<string, number>;
 }
 
 interface PartnerFormState {
@@ -110,10 +128,22 @@ interface PartnerFormState {
   description: string;
   logoUrl: string;
   websiteUrl: string;
+  wazeUrl: string;
   phone: string;
+  whatsapp: string;
   city: string;
   isActive: boolean;
   isPremium: boolean;
+  sortOrder: string;
+}
+
+interface PartnerLocationFormState {
+  name: string;
+  address: string;
+  city: string;
+  phone: string;
+  whatsapp: string;
+  wazeUrl: string;
   sortOrder: string;
 }
 
@@ -160,10 +190,22 @@ const EMPTY_PARTNER_FORM: PartnerFormState = {
   description: '',
   logoUrl: '',
   websiteUrl: '',
+  wazeUrl: '',
   phone: '',
+  whatsapp: '',
   city: '',
   isActive: true,
   isPremium: false,
+  sortOrder: '0',
+};
+
+const EMPTY_LOCATION_FORM: PartnerLocationFormState = {
+  name: '',
+  address: '',
+  city: '',
+  phone: '',
+  whatsapp: '',
+  wazeUrl: '',
   sortOrder: '0',
 };
 
@@ -193,6 +235,14 @@ function money(value: number | null | undefined) {
 
 function numberBR(value: number | null | undefined) {
   return value == null ? '-' : value.toLocaleString('pt-BR');
+}
+
+function partnerClickSourceCount(partner: AdminPartner, source: string) {
+  return partner.clickSources?.[source] ?? 0;
+}
+
+function locationClickSourceCount(location: AdminPartnerLocation, source: string) {
+  return location.clickSources?.[source] ?? 0;
 }
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -284,9 +334,11 @@ export default function AdminPage() {
   const [flags, setFlags] = useState<FeatureFlags | null>(null);
   const [adminPartners, setAdminPartners] = useState<AdminPartner[]>([]);
   const [partnerForm, setPartnerForm] = useState<PartnerFormState>(EMPTY_PARTNER_FORM);
+  const [locationForms, setLocationForms] = useState<Record<string, PartnerLocationFormState>>({});
   const [loading, setLoading] = useState(true);
   const [savingFlag, setSavingFlag] = useState(false);
   const [savingPartner, setSavingPartner] = useState(false);
+  const [savingLocationFor, setSavingLocationFor] = useState<string | null>(null);
   const [loadingPartners, setLoadingPartners] = useState(false);
   const [error, setError] = useState('');
   const [user, setUser] = useState<{ name?: string | null; email: string } | null>(null);
@@ -425,6 +477,46 @@ export default function AdminPage() {
       await fetchStats();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erro ao atualizar parceiro');
+    }
+  }
+
+  async function handleCreatePartnerLocation(event: FormEvent<HTMLFormElement>, partnerId: string) {
+    event.preventDefault();
+    const form = locationForms[partnerId] || EMPTY_LOCATION_FORM;
+    setSavingLocationFor(partnerId);
+    setError('');
+    try {
+      const res = await fetch(apiUrl(`/api/admin/partners/${partnerId}/locations`), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, sortOrder: Number(form.sortOrder || 0), isActive: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao cadastrar unidade');
+      setLocationForms((current) => ({ ...current, [partnerId]: EMPTY_LOCATION_FORM }));
+      await fetchAdminPartners();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao cadastrar unidade');
+    } finally {
+      setSavingLocationFor(null);
+    }
+  }
+
+  async function updatePartnerLocation(locationId: string, patch: Partial<Pick<AdminPartnerLocation, 'isActive'>>) {
+    setError('');
+    try {
+      const res = await fetch(apiUrl(`/api/admin/partner-locations/${locationId}`), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao atualizar unidade');
+      await fetchAdminPartners();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erro ao atualizar unidade');
     }
   }
 
@@ -759,6 +851,15 @@ export default function AdminPage() {
                       />
                     </label>
                     <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">WhatsApp</span>
+                      <input
+                        value={partnerForm.whatsapp}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, whatsapp: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="(11) 99999-9999"
+                      />
+                    </label>
+                    <label className="grid gap-1">
                       <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Cidade</span>
                       <input
                         value={partnerForm.city}
@@ -775,6 +876,16 @@ export default function AdminPage() {
                         onChange={(event) => setPartnerForm((form) => ({ ...form, websiteUrl: event.target.value }))}
                         className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
                         placeholder="https://..."
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-zinc-400">Link do Waze</span>
+                      <input
+                        type="url"
+                        value={partnerForm.wazeUrl}
+                        onChange={(event) => setPartnerForm((form) => ({ ...form, wazeUrl: event.target.value }))}
+                        className="rounded-lg border border-zinc-200 px-3 py-3 text-sm font-bold outline-none focus:border-zinc-950"
+                        placeholder="https://waze.com/ul?..."
                       />
                     </label>
                     <label className="grid gap-1">
@@ -856,10 +967,20 @@ export default function AdminPage() {
                             <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-zinc-400">
                               <span>{partner._count.clicks} cliques</span>
                               <span>{partner._count.leads} leads</span>
+                              <span>Oferta {partnerClickSourceCount(partner, 'partners_page_offer')}</span>
+                              <span>Waze {partnerClickSourceCount(partner, 'partners_page_waze')}</span>
+                              <span>WhatsApp {partnerClickSourceCount(partner, 'partners_page_whatsapp')}</span>
+                              <span>Ligacao {partnerClickSourceCount(partner, 'partners_page_phone')}</span>
                               {partner.phone && <span>{partner.phone}</span>}
+                              {partner.whatsapp && <span>WhatsApp {partner.whatsapp}</span>}
                               {partner.websiteUrl && (
                                 <a className="text-sky-700" href={partner.websiteUrl} target="_blank" rel="noreferrer">
                                   Abrir site
+                                </a>
+                              )}
+                              {partner.wazeUrl && (
+                                <a className="text-sky-700" href={partner.wazeUrl} target="_blank" rel="noreferrer">
+                                  Abrir Waze
                                 </a>
                               )}
                             </div>
@@ -880,6 +1001,109 @@ export default function AdminPage() {
                               {partner.isActive ? 'Desativar' : 'Ativar'}
                             </button>
                           </div>
+                        </div>
+                        <div className="mt-4 rounded-lg bg-zinc-50 p-3">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-black text-zinc-800">Unidades</p>
+                            <span className="text-xs font-bold text-zinc-400">{partner.locations.length} cadastradas</span>
+                          </div>
+                          {partner.locations.length > 0 && (
+                            <div className="mb-3 grid gap-2">
+                              {partner.locations.map((location) => (
+                                <div key={location.id} className="rounded-lg border border-zinc-200 bg-white p-3">
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className="text-sm font-black text-zinc-900">{location.name}</p>
+                                        <span className={`rounded-full px-2 py-1 text-[10px] font-black ${location.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                                          {location.isActive ? 'Ativa' : 'Inativa'}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 text-xs font-semibold text-zinc-500">
+                                        {[location.address, location.city].filter(Boolean).join(' · ') || 'Sem endereco'}
+                                      </p>
+                                      <div className="mt-2 flex flex-wrap gap-3 text-[11px] font-bold text-zinc-400">
+                                        <span>{location._count.clicks} cliques</span>
+                                        <span>Waze {locationClickSourceCount(location, 'partners_page_waze')}</span>
+                                        <span>WhatsApp {locationClickSourceCount(location, 'partners_page_whatsapp')}</span>
+                                        <span>Ligacao {locationClickSourceCount(location, 'partners_page_phone')}</span>
+                                        {location.phone && <span>{location.phone}</span>}
+                                        {location.whatsapp && <span>WhatsApp {location.whatsapp}</span>}
+                                        {location.wazeUrl && <a className="text-sky-700" href={location.wazeUrl} target="_blank" rel="noreferrer">Abrir Waze</a>}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => updatePartnerLocation(location.id, { isActive: !location.isActive })}
+                                      className={`rounded-lg px-3 py-2 text-xs font-black ${
+                                        location.isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                      }`}
+                                    >
+                                      {location.isActive ? 'Desativar' : 'Ativar'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <form onSubmit={(event) => handleCreatePartnerLocation(event, partner.id)} className="grid gap-2">
+                            <div className="grid gap-2 md:grid-cols-3">
+                              <input
+                                required
+                                value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).name}
+                                onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), name: event.target.value } }))}
+                                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                placeholder="Nome da unidade"
+                              />
+                              <input
+                                value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).address}
+                                onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), address: event.target.value } }))}
+                                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                placeholder="Endereco"
+                              />
+                              <input
+                                value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).city}
+                                onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), city: event.target.value } }))}
+                                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                placeholder="Cidade"
+                              />
+                              <input
+                                value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).phone}
+                                onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), phone: event.target.value } }))}
+                                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                placeholder="Telefone"
+                              />
+                              <input
+                                value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).whatsapp}
+                                onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), whatsapp: event.target.value } }))}
+                                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                placeholder="WhatsApp"
+                              />
+                              <input
+                                type="url"
+                                value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).wazeUrl}
+                                onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), wazeUrl: event.target.value } }))}
+                                className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                placeholder="Link do Waze"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="flex items-center gap-2 text-xs font-black text-zinc-600">
+                                Ordem
+                                <input
+                                  type="number"
+                                  value={(locationForms[partner.id] || EMPTY_LOCATION_FORM).sortOrder}
+                                  onChange={(event) => setLocationForms((forms) => ({ ...forms, [partner.id]: { ...(forms[partner.id] || EMPTY_LOCATION_FORM), sortOrder: event.target.value } }))}
+                                  className="w-20 rounded-lg border border-zinc-200 px-2 py-2 text-xs font-bold outline-none focus:border-zinc-950"
+                                />
+                              </label>
+                              <button
+                                disabled={savingLocationFor === partner.id}
+                                className="rounded-lg bg-zinc-950 px-4 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {savingLocationFor === partner.id ? 'Salvando...' : 'Adicionar unidade'}
+                              </button>
+                            </div>
+                          </form>
                         </div>
                       </div>
                     ))}

@@ -175,10 +175,23 @@ export interface Partner {
   description?: string;
   logoUrl?: string;
   websiteUrl?: string;
+  wazeUrl?: string;
   phone?: string;
+  whatsapp?: string;
   city?: string;
   isPremium: boolean;
+  locations?: PartnerLocation[];
   _count?: { clicks: number };
+}
+
+export interface PartnerLocation {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  phone?: string;
+  whatsapp?: string;
+  wazeUrl?: string;
 }
 
 export async function getPartners(category?: string): Promise<Partner[]> {
@@ -186,9 +199,9 @@ export async function getPartners(category?: string): Promise<Partner[]> {
   return res.data.data;
 }
 
-export async function trackPartnerClick(partnerId: string, source?: string) {
+export async function trackPartnerClick(partnerId: string, source?: string, partnerLocationId?: string) {
   try {
-    await api.post('/api/partners/click', { partnerId, source });
+    await api.post('/api/partners/click', { partnerId, source, partnerLocationId });
   } catch {
     // Silently fail - analytics tracking shouldn't break UX
   }

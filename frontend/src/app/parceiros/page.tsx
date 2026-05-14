@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { getPartners, trackPartnerClick, Partner } from '@/lib/api';
+import { getPartners, trackPartnerClick, Partner, PartnerLocation } from '@/lib/api';
 
 const categories = [
   { value: '', label: 'Todos' },
@@ -29,6 +29,14 @@ const categoryInitials: Record<string, string> = {
   vehicle_protection: 'SG',
 };
 
+function buildWhatsAppUrl(phone: string, partnerName: string) {
+  const digits = phone.replace(/\D/g, '');
+  const normalized = digits.startsWith('55') ? digits : `55${digits}`;
+  const message = `Olá, vim pelo app Táxi Combinado e gostaria de ajuda com ${partnerName}.`;
+
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+}
+
 export default function ParceirosPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +57,55 @@ export default function ParceirosPage() {
     fetchPartners();
   }, [selectedCategory]);
 
-  const handlePartnerClick = async (partner: Partner) => {
-    await trackPartnerClick(partner.id, 'partners_page');
-    if (partner.websiteUrl) {
-      window.open(partner.websiteUrl, '_blank', 'noopener,noreferrer');
-    }
+  const handlePartnerClick = async (partner: Partner, url: string, source: string, partnerLocationId?: string) => {
+    await trackPartnerClick(partner.id, source, partnerLocationId);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
+
+  const renderContactButtons = (
+    partner: Partner,
+    target: Partner | PartnerLocation,
+    options: { showOffer?: boolean; locationId?: string } = {}
+  ) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {target.phone && (
+        <a
+          href={`tel:${target.phone}`}
+          onClick={() => {
+            void trackPartnerClick(partner.id, 'partners_page_phone', options.locationId);
+          }}
+          style={{ flex: '1 1 92px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1.5px solid var(--gray-200)', background: 'var(--surface)', color: 'var(--ink)', borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          Ligar
+        </a>
+      )}
+      {target.whatsapp && (
+        <button
+          onClick={() => handlePartnerClick(partner, buildWhatsAppUrl(target.whatsapp as string, partner.name), 'partners_page_whatsapp', options.locationId)}
+          style={{ flex: '1 1 112px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#25D366', color: '#062b14', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          WhatsApp
+        </button>
+      )}
+      {options.showOffer && partner.websiteUrl && (
+        <button
+          onClick={() => handlePartnerClick(partner, partner.websiteUrl as string, 'partners_page_offer')}
+          style={{ flex: '1 1 112px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Ver oferta
+        </button>
+      )}
+      {target.wazeUrl && (
+        <button
+          onClick={() => handlePartnerClick(partner, target.wazeUrl as string, 'partners_page_waze', options.locationId)}
+          style={{ flex: '1 1 92px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#33CCFF', color: 'var(--ink)', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Waze
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <PageContainer>
@@ -132,25 +183,24 @@ export default function ParceirosPage() {
                 {partner.description && (
                   <p style={{ fontSize: 13, color: 'var(--gray-700)', fontWeight: 600, marginBottom: 10, lineHeight: 1.4 }}>{partner.description}</p>
                 )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {partner.phone && (
-                    <a
-                      href={`tel:${partner.phone}`}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1.5px solid var(--gray-200)', background: 'var(--surface)', color: 'var(--ink)', borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}
-                    >
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                      Ligar
-                    </a>
-                  )}
-                  {partner.websiteUrl && (
-                    <button
-                      onClick={() => handlePartnerClick(partner)}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-                    >
-                      Ver oferta
-                    </button>
-                  )}
-                </div>
+                {partner.locations?.length ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {partner.websiteUrl && renderContactButtons(partner, partner, { showOffer: true })}
+                    {partner.locations.map((location) => (
+                      <div key={location.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 12, padding: 10, background: 'rgba(255,255,255,.72)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{location.name}</div>
+                        {(location.address || location.city) && (
+                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginTop: 2, marginBottom: 8 }}>
+                            {[location.address, location.city].filter(Boolean).join(' · ')}
+                          </div>
+                        )}
+                        {renderContactButtons(partner, location, { locationId: location.id })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  renderContactButtons(partner, partner, { showOffer: true })
+                )}
               </div>
             </div>
           ))}

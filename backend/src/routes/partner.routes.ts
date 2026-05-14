@@ -25,9 +25,24 @@ router.get('/', async (req: Request, res: Response) => {
         description: true,
         logoUrl: true,
         websiteUrl: true,
+        wazeUrl: true,
         phone: true,
+        whatsapp: true,
         city: true,
         isPremium: true,
+        locations: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            phone: true,
+            whatsapp: true,
+            wazeUrl: true,
+          },
+        },
         _count: { select: { clicks: true } },
       },
     });
@@ -47,6 +62,7 @@ router.post('/click', async (req: Request, res: Response) => {
     await prisma.partnerClick.create({
       data: {
         partnerId: input.partnerId,
+        partnerLocationId: input.partnerLocationId,
         anonymousId: req.anonymousId,
         source: input.source,
       },

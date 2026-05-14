@@ -34,7 +34,9 @@ const adminPartnerSchema = z.object({
   description: z.string().optional().or(z.literal('')),
   logoUrl: z.string().url().optional().or(z.literal('')),
   websiteUrl: z.string().url().optional().or(z.literal('')),
+  wazeUrl: z.string().url().optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
+  whatsapp: z.string().optional().or(z.literal('')),
   city: z.string().optional().or(z.literal('')),
   isActive: z.boolean().optional(),
   isPremium: z.boolean().optional(),
@@ -42,6 +44,19 @@ const adminPartnerSchema = z.object({
 });
 
 const adminPartnerUpdateSchema = adminPartnerSchema.partial();
+
+const adminPartnerLocationSchema = z.object({
+  name: z.string().min(2),
+  address: z.string().optional().or(z.literal('')),
+  city: z.string().optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
+  whatsapp: z.string().optional().or(z.literal('')),
+  wazeUrl: z.string().url().optional().or(z.literal('')),
+  isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});
+
+const adminPartnerLocationUpdateSchema = adminPartnerLocationSchema.partial();
 
 function emptyToNull(value?: string): string | null {
   const trimmed = value?.trim();
@@ -375,10 +390,38 @@ router.get('/partners', async (_req: Request, res: Response) => {
       orderBy: [{ isActive: 'desc' }, { isPremium: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
       include: {
         _count: { select: { clicks: true, leads: true } },
+        locations: {
+          orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+          include: {
+            _count: { select: { clicks: true } },
+          },
+        },
       },
     });
 
-    return res.json({ success: true, data: partners });
+    const clickSources = await prisma.partnerClick.groupBy({
+      by: ['partnerId', 'partnerLocationId', 'source'],
+      where: { partnerId: { in: partners.map((partner) => partner.id) } },
+      _count: { _all: true },
+    });
+
+    const clickSourceMap = clickSources.reduce<Record<string, Record<string, number>>>((acc, item) => {
+      const key = item.partnerLocationId ? `${item.partnerId}:${item.partnerLocationId}` : item.partnerId;
+      acc[key] = acc[key] || {};
+      acc[key][item.source || 'unknown'] = item._count._all;
+      return acc;
+    }, {});
+
+    const partnersWithClickSources = partners.map((partner) => ({
+      ...partner,
+      clickSources: clickSourceMap[partner.id] || {},
+      locations: partner.locations.map((location) => ({
+        ...location,
+        clickSources: clickSourceMap[`${partner.id}:${location.id}`] || {},
+      })),
+    }));
+
+    return res.json({ success: true, data: partnersWithClickSources });
   } catch (error) {
     console.error('Admin partners list error:', error);
     return res.status(500).json({ success: false, error: 'Erro ao buscar parceiros' });
@@ -397,7 +440,9 @@ router.post('/partners', async (req: Request, res: Response) => {
         description: emptyToNull(input.description),
         logoUrl: emptyToNull(input.logoUrl),
         websiteUrl: emptyToNull(input.websiteUrl),
+        wazeUrl: emptyToNull(input.wazeUrl),
         phone: emptyToNull(input.phone),
+        whatsapp: emptyToNull(input.whatsapp),
         city: emptyToNull(input.city),
         isActive: input.isActive ?? true,
         isPremium: input.isPremium ?? false,
@@ -405,6 +450,7 @@ router.post('/partners', async (req: Request, res: Response) => {
       },
       include: {
         _count: { select: { clicks: true, leads: true } },
+        locations: true,
       },
     });
 
@@ -430,7 +476,9 @@ router.patch('/partners/:id', async (req: Request, res: Response) => {
     if (input.description !== undefined) data.description = emptyToNull(input.description);
     if (input.logoUrl !== undefined) data.logoUrl = emptyToNull(input.logoUrl);
     if (input.websiteUrl !== undefined) data.websiteUrl = emptyToNull(input.websiteUrl);
+    if (input.wazeUrl !== undefined) data.wazeUrl = emptyToNull(input.wazeUrl);
     if (input.phone !== undefined) data.phone = emptyToNull(input.phone);
+    if (input.whatsapp !== undefined) data.whatsapp = emptyToNull(input.whatsapp);
     if (input.city !== undefined) data.city = emptyToNull(input.city);
     if (input.isActive !== undefined) data.isActive = input.isActive;
     if (input.isPremium !== undefined) data.isPremium = input.isPremium;
@@ -441,6 +489,7 @@ router.patch('/partners/:id', async (req: Request, res: Response) => {
       data,
       include: {
         _count: { select: { clicks: true, leads: true } },
+        locations: true,
       },
     });
 
@@ -451,6 +500,73 @@ router.patch('/partners/:id', async (req: Request, res: Response) => {
     }
     console.error('Admin partner update error:', error);
     return res.status(500).json({ success: false, error: 'Erro ao atualizar parceiro' });
+  }
+});
+
+// ─── POST /api/admin/partners/:id/locations ───────────────────────
+router.post('/partners/:id/locations', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const input = adminPartnerLocationSchema.parse(req.body);
+
+    const location = await prisma.partnerLocation.create({
+      data: {
+        partnerId: id,
+        name: input.name.trim(),
+        address: emptyToNull(input.address),
+        city: emptyToNull(input.city),
+        phone: emptyToNull(input.phone),
+        whatsapp: emptyToNull(input.whatsapp),
+        wazeUrl: emptyToNull(input.wazeUrl),
+        isActive: input.isActive ?? true,
+        sortOrder: input.sortOrder ?? 0,
+      },
+      include: {
+        _count: { select: { clicks: true } },
+      },
+    });
+
+    return res.status(201).json({ success: true, data: location });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ success: false, error: 'Dados invalidos', details: error.errors });
+    }
+    console.error('Admin partner location create error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao cadastrar unidade' });
+  }
+});
+
+// ─── PATCH /api/admin/partner-locations/:id ───────────────────────
+router.patch('/partner-locations/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const input = adminPartnerLocationUpdateSchema.parse(req.body);
+
+    const data: Record<string, string | number | boolean | null> = {};
+    if (input.name !== undefined) data.name = input.name.trim();
+    if (input.address !== undefined) data.address = emptyToNull(input.address);
+    if (input.city !== undefined) data.city = emptyToNull(input.city);
+    if (input.phone !== undefined) data.phone = emptyToNull(input.phone);
+    if (input.whatsapp !== undefined) data.whatsapp = emptyToNull(input.whatsapp);
+    if (input.wazeUrl !== undefined) data.wazeUrl = emptyToNull(input.wazeUrl);
+    if (input.isActive !== undefined) data.isActive = input.isActive;
+    if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder;
+
+    const location = await prisma.partnerLocation.update({
+      where: { id },
+      data,
+      include: {
+        _count: { select: { clicks: true } },
+      },
+    });
+
+    return res.json({ success: true, data: location });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ success: false, error: 'Dados invalidos', details: error.errors });
+    }
+    console.error('Admin partner location update error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao atualizar unidade' });
   }
 });
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const partnerClickSchema = z.object({
   partnerId: z.string().uuid(),
+  partnerLocationId: z.string().uuid().optional(),
   source: z.string().optional(),
 });
 
