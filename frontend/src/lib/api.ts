@@ -298,3 +298,14 @@ export async function createFuelLog(data: Record<string, unknown>) {
   const res = await api.post('/api/account/fuel-logs', data);
   return res.data.data;
 }
+
+export interface PopularRoute {
+  origin: string | null;
+  destination: string | null;
+  count: number;
+}
+
+export async function getPopularRoutes(): Promise<PopularRoute[]> {
+  const res = await api.get('/api/quotes/popular');
+  return res.data.data;
+}

@@ -235,6 +235,34 @@ router.get('/history', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/quotes/popular
+router.get('/popular', async (_req: Request, res: Response) => {
+  try {
+    const popular = await prisma.quote.groupBy({
+      by: ['originAddress', 'destinationAddress'],
+      _count: { id: true },
+      where: {
+        originAddress: { not: null },
+        destinationAddress: { not: null },
+      },
+      orderBy: { _count: { id: 'desc' } },
+      take: 10,
+    });
+
+    return res.json({
+      success: true,
+      data: popular.map((r) => ({
+        origin: r.originAddress,
+        destination: r.destinationAddress,
+        count: r._count.id,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching popular routes:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar rotas populares' });
+  }
+});
+
 // GET /api/quotes/:id
 router.get('/:id', async (req: Request, res: Response) => {
   try {
