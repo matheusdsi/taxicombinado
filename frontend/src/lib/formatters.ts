@@ -46,20 +46,47 @@ export function formatDuration(minutes: number): string {
  * Handles "1234.56" -> 1234.56
  */
 export function parseMoneyInput(value: string): number {
+  return parseBrazilianCurrency(value);
+}
+
+export function parseBrazilianCurrency(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   if (!value) return 0;
 
-  // Remove currency symbol and whitespace
-  let cleaned = value.replace(/R\$\s?/g, '').trim();
+  const cleaned = value
+    .replace(/\s/g, '')
+    .replace(/^R\$/i, '')
+    .replace(/[^\d,.-]/g, '');
 
-  // Handle Brazilian format: 1.234,56
-  // If there's a comma and it looks like decimal separator
-  if (cleaned.includes(',')) {
-    // Remove thousand separators (dots) and replace decimal comma with dot
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  if (!cleaned) return 0;
+
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (lastComma > -1 && lastDot > -1) {
+    const decimalSeparator = lastComma > lastDot ? ',' : '.';
+    const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+    return parseCurrencyNumber(cleaned, thousandsSeparator, decimalSeparator);
   }
 
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
+  if (lastComma > -1) {
+    return parseCurrencyNumber(cleaned, '.', ',');
+  }
+
+  if (lastDot > -1) {
+    return parseCurrencyNumber(cleaned, ',', '.');
+  }
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseCurrencyNumber(value: string, thousandsSeparator: string, decimalSeparator: string): number {
+  const normalized = value
+    .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+    .replace(decimalSeparator, '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /**

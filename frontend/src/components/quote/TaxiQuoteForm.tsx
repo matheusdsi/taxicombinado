@@ -43,6 +43,7 @@ const schema = z.object({
   consumptionKmPerLiter: z.number().positive('Informe o consumo'),
   fuelPricePerLiter: z.number().positive('Informe o preço'),
   fuelType: z.string(),
+  vehicleExtraCostPerKm: z.number().min(0),
   baseFare: z.number().min(0),
   pricePerKm: z.number().min(0),
   waitingPrice: z.number().min(0),
@@ -145,6 +146,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       consumptionKmPerLiter: 11,
       fuelPricePerLiter: 6.29,
       fuelType: 'gasoline',
+      vehicleExtraCostPerKm: 0.8,
       baseFare: PRESETS.comum.baseFare,
       pricePerKm: PRESETS.comum.pricePerKm,
       waitingPrice: Number(PRESETS.comum.waitingPrice.toFixed(4)),
@@ -243,7 +245,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       const response = await calculateQuote({
         ...data,
         estimatedMinutes: 0,
-        vehicleExtraCostPerKm: 0,
+        vehicleExtraCostPerKm: data.vehicleExtraCostPerKm,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
         stops: [],
@@ -424,6 +426,9 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
           )} />
           <Controller name="extraCosts" control={control} render={({ field }) => (
             <MoneyInput label="Outros custos" value={field.value} onChange={field.onChange} />
+          )} />
+          <Controller name="vehicleExtraCostPerKm" control={control} render={({ field }) => (
+            <MoneyInput label="Custo do carro/km" value={field.value} onChange={field.onChange} />
           )} />
         </div>
       </Section>

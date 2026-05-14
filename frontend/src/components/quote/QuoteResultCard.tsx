@@ -39,7 +39,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
   const [showDetails, setShowDetails] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
 
-  const profitRecommended = result.recommendedPrice - result.totalCost;
+  const profitRecommended = result.profit;
   const profitIdeal = result.idealPrice - result.totalCost;
   const marginIdeal = result.idealPrice > 0 ? (profitIdeal / result.idealPrice) * 100 : 0;
   const lucroPositivo = profitRecommended > 0;
@@ -224,6 +224,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
           <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--gray-100)' }}>
             <div style={{ paddingTop: 12 }}>
               <CostRow label="Combustível"     value={result.fuelCost} />
+              {result.vehicleExtraCost > 0 && <CostRow label="Custo do carro" value={result.vehicleExtraCost} />}
               {result.tollTotal > 0    && <CostRow label="Pedágios"         value={result.tollTotal} />}
               {result.parkingCost > 0  && <CostRow label="Estacionamento"   value={result.parkingCost} />}
               {result.extraCosts > 0   && <CostRow label="Outras taxas"     value={result.extraCosts} />}
@@ -284,7 +285,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
             <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, color: result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--gray-500)' }}>
               {result.customChargedPrice < result.minimumPrice
                 ? 'Abaixo do mínimo — pode dar prejuízo'
-                : `Lucro: ${formatCurrencyBRL(result.customChargedPrice - result.totalCost)}`}
+                : `Lucro: ${formatCurrencyBRL(result.profit)}`}
             </div>
           </div>
           <div style={{ fontWeight: 800, fontSize: 22, color: result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--ink)' }}>

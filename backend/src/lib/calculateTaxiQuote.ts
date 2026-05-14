@@ -181,9 +181,12 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
 
   // ─── Outcome ─────────────────────────────────────────────────
 
-  const effectivePrice = customChargedPrice ?? recommendedPrice;
-  const profit = effectivePrice - totalCost;
-  const margin = effectivePrice > 0 ? (profit / effectivePrice) * 100 : 0;
+  const roundedTotalCost = round2(totalCost);
+  const roundedRecommendedPrice = round2(recommendedPrice);
+  const roundedCustomChargedPrice = customChargedPrice !== undefined ? round2(customChargedPrice) : undefined;
+  const effectivePrice = roundedCustomChargedPrice ?? roundedRecommendedPrice;
+  const profit = calculateProfit(effectivePrice, roundedTotalCost);
+  const margin = calculateMargin(profit, effectivePrice);
 
   // ─── Alerts ──────────────────────────────────────────────────
 
@@ -270,19 +273,19 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     tollTotal: round2(tollTotal),
     parkingCost: round2(parkingCost),
     extraCosts: round2(extraCosts),
-    totalCost: round2(totalCost),
+    totalCost: roundedTotalCost,
 
     timeCharge: round2(timeCharge),
     farePrice: round2(farePrice),
 
     minimumPrice: round2(minimumPrice),
     priceWithMargin: round2(priceWithMargin),
-    recommendedPrice: round2(recommendedPrice),
+    recommendedPrice: roundedRecommendedPrice,
     idealPrice: round2(idealPrice),
-    customChargedPrice: customChargedPrice !== undefined ? round2(customChargedPrice) : undefined,
+    customChargedPrice: roundedCustomChargedPrice,
 
-    profit: round2(profit),
-    margin: round2(margin),
+    profit,
+    margin,
 
     alerts,
   };
@@ -290,4 +293,52 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+export function calculateProfit(price: number, totalCost: number): number {
+  return round2(price - totalCost);
+}
+
+export function calculateMargin(profit: number, price: number): number {
+  return price > 0 ? round2((profit / price) * 100) : 0;
+}
+
+export function parseBrazilianCurrency(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (!value) return 0;
+
+  const cleaned = value
+    .replace(/\s/g, '')
+    .replace(/^R\$/i, '')
+    .replace(/[^\d,.-]/g, '');
+
+  if (!cleaned) return 0;
+
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (lastComma > -1 && lastDot > -1) {
+    const decimalSeparator = lastComma > lastDot ? ',' : '.';
+    const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+    return parseCurrencyNumber(cleaned, thousandsSeparator, decimalSeparator);
+  }
+
+  if (lastComma > -1) {
+    return parseCurrencyNumber(cleaned, '.', ',');
+  }
+
+  if (lastDot > -1) {
+    return parseCurrencyNumber(cleaned, ',', '.');
+  }
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseCurrencyNumber(value: string, thousandsSeparator: string, decimalSeparator: string): number {
+  const normalized = value
+    .replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '')
+    .replace(decimalSeparator, '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

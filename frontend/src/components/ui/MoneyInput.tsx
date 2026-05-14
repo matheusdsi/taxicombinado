@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, useState, useCallback, useEffect } from 'react';
+import { parseBrazilianCurrency } from '@/lib/formatters';
 
 interface MoneyInputProps {
   label: string;
@@ -39,14 +40,9 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
         const raw = e.target.value;
         setDisplayValue(raw);
 
-        // Parse the value
-        let cleaned = raw.replace(/[^\d,]/g, '');
-        cleaned = cleaned.replace(',', '.');
-        const parsed = parseFloat(cleaned);
-        if (!isNaN(parsed)) {
+        const parsed = parseBrazilianCurrency(raw);
+        if (Number.isFinite(parsed)) {
           onChange(parsed);
-        } else if (cleaned === '' || cleaned === '.') {
-          onChange(0);
         }
       },
       [onChange]
