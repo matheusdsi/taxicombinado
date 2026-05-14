@@ -531,8 +531,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
                   onClick={() => {
                     setValue('flagMultiplier', opt.value);
                     const p = PRESETS[activePreset];
-                    const kmRate = opt.value === 1.3 ? Number((p.pricePerKm * 1.3).toFixed(4)) : p.pricePerKm;
-                    setValue('pricePerKm', kmRate, { shouldValidate: true });
+                    setValue('pricePerKm', p.pricePerKm, { shouldValidate: true });
                   }}
                   style={{
                     padding: '10px 12px', borderRadius: 12, border: '1.5px solid', textAlign: 'left',
