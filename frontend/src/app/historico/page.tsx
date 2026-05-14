@@ -142,7 +142,7 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
             )) : (
               <p style={{ fontSize: 13, color: 'var(--gray-500)', fontWeight: 700 }}>Essa cotacao antiga nao guardou a abertura dos custos.</p>
             )}
-            {Number(quote.timeCharge) > 0 && <DetailLine label="Espera/parado cobrada" value={formatCurrencyBRL(Number(quote.timeCharge))} />}
+            {Number(quote.timeCharge) > 0 && <DetailLine label="Tempo no taxímetro" value={formatCurrencyBRL(Number(quote.timeCharge))} />}
             <DetailLine label="Gasto total estimado" value={formatCurrencyBRL(quote.totalCost)} strong />
           </div>
 
@@ -150,7 +150,7 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
             <div className="tc-section-title">Dados usados</div>
             <DetailLine label="Distancia total" value={formatDistance(totalDistance)} />
             {Number(quote.returnDistanceKm) > 0 && <DetailLine label="Volta considerada" value={formatDistance(Number(quote.returnDistanceKm))} />}
-            {Number(quote.estimatedMinutes) > 0 && <DetailLine label="Tempo de espera" value={`${Math.round(Number(quote.estimatedMinutes) / 60 * 10) / 10} h`} />}
+            {Number(quote.estimatedMinutes) > 0 && <DetailLine label="Tempo parado estimado" value={`${Math.round(Number(quote.estimatedMinutes))} min`} />}
             {Number(quote.fuelPricePerLiter) > 0 && <DetailLine label="Combustivel informado" value={formatCurrencyBRL(Number(quote.fuelPricePerLiter))} />}
             {Number(quote.consumptionKmPerLiter) > 0 && <DetailLine label="Consumo do carro" value={`${Number(quote.consumptionKmPerLiter)} km/l`} />}
           </div>
@@ -323,7 +323,7 @@ export default function HistoricoPage() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     <Pill>{tripTypeLabels[quote.tripType] || quote.tripType}</Pill>
-                    {quote.timeCharge && quote.timeCharge > 0 ? <Pill tone="yellow">Com espera</Pill> : null}
+                    {quote.tripType === 'round_trip' && Number(quote.estimatedMinutes) > 30 ? <Pill tone="yellow">Com espera</Pill> : null}
                     {quote.profit < 0 ? <Pill tone="red">Deu prejuizo</Pill> : <Pill tone="green">Sobrou dinheiro</Pill>}
                     {quote.isLocal && <Pill>Local</Pill>}
                   </div>

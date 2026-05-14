@@ -353,6 +353,8 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [user, setUser] = useState<{ name?: string | null; email: string } | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('master');
+  const [adminSelectedQuote, setAdminSelectedQuote] = useState<AdminStats['recentActivity']['quotes'][0] | null>(null);
+  const [quotesTablePage, setQuotesTablePage] = useState(1);
 
   const fetchSettings = useCallback(async () => {
     const res = await fetch(apiUrl('/api/admin/settings'), { credentials: 'include' });
@@ -594,7 +596,10 @@ export default function AdminPage() {
   const maxDailyQuotes = Math.max(1, ...timeSeries.quotesPerDay.map((item) => item.count));
   const alertTotal = breakdowns.alertsFrequency.reduce((sum, item) => sum + item.count, 0);
   const recentPriceRows = [...timeSeries.avgPricePerDay].reverse().slice(0, 10);
-  const recentQuoteRows = recentActivity.quotes.slice(0, 12);
+  const QUOTES_PER_PAGE = 10;
+  const allQuoteRows = recentActivity.quotes;
+  const quotesPageTotal = Math.ceil(allQuoteRows.length / QUOTES_PER_PAGE);
+  const recentQuoteRows = allQuoteRows.slice((quotesTablePage - 1) * QUOTES_PER_PAGE, quotesTablePage * QUOTES_PER_PAGE);
 
   return (
     <main className="min-h-screen bg-[#f4f3ef] text-zinc-950">
@@ -694,7 +699,13 @@ export default function AdminPage() {
               <div className="grid gap-5 xl:grid-cols-3">
                 <Card className="p-5 xl:col-span-2">
                   <SectionHeader title="Ultimas cotacoes" eyebrow="Operacao" />
-                  <QuotesTable rows={recentQuoteRows} />
+                  <QuotesTable
+                    rows={recentQuoteRows}
+                    onSelect={setAdminSelectedQuote}
+                    page={quotesTablePage}
+                    totalPages={quotesPageTotal}
+                    onPageChange={setQuotesTablePage}
+                  />
                 </Card>
                 <Card className="p-5">
                   <SectionHeader title="Alertas frequentes" eyebrow="Risco" />
@@ -797,26 +808,42 @@ export default function AdminPage() {
                 <MetricCard label="Cotacoes por sessao" value={`${computed.conversion.toFixed(1)}%`} tone="yellow" />
               </div>
               <Card className="p-5">
-                <SectionHeader title="Sessoes anonimas recentes" />
+                <SectionHeader title="Sessoes recentes" />
+                <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800">
+                  Cada linha é uma sessão de navegador distinta. Se um mesmo usuário recarregar a página sem o cookie ativo, aparece como nova sessão — isso é esperado para visitantes anônimos.
+                </p>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[620px] text-sm">
+                  <table className="w-full min-w-[560px] text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
-                        <th className="py-3 text-left">Sessao</th>
-                        <th className="py-3 text-right">Cotacoes</th>
+                        <th className="py-3 text-left">ID da sessão</th>
+                        <th className="py-3 text-right">Cotações feitas</th>
                         <th className="py-3 text-left">Primeira visita</th>
-                        <th className="py-3 text-left">Ultima visita</th>
+                        <th className="py-3 text-left">Última atividade</th>
+                        <th className="py-3 text-right">Duração</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {recentActivity.sessions.map((session) => (
-                        <tr key={session.id}>
-                          <td className="py-3 font-mono text-xs font-bold text-zinc-500">{session.sessionId.slice(0, 12)}...</td>
-                          <td className="py-3 text-right font-black text-zinc-950">{session._count.quotes}</td>
-                          <td className="py-3 font-semibold text-zinc-500">{fmtDate(session.createdAt)}</td>
-                          <td className="py-3 font-semibold text-zinc-500">{fmtDate(session.lastSeen)}</td>
-                        </tr>
-                      ))}
+                      {recentActivity.sessions.map((session) => {
+                        const firstMs = new Date(session.createdAt).getTime();
+                        const lastMs = new Date(session.lastSeen).getTime();
+                        const diffMin = Math.round((lastMs - firstMs) / 60000);
+                        const duration = diffMin < 1 ? '< 1 min' : diffMin < 60 ? `${diffMin} min` : `${(diffMin / 60).toFixed(1)} h`;
+                        const hasQuotes = session._count.quotes > 0;
+                        return (
+                          <tr key={session.id}>
+                            <td className="py-3 font-mono text-xs font-bold text-zinc-400">{session.sessionId.slice(0, 8)}…</td>
+                            <td className="py-3 text-right">
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-black ${hasQuotes ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-400'}`}>
+                                {session._count.quotes} {session._count.quotes === 1 ? 'cotação' : 'cotações'}
+                              </span>
+                            </td>
+                            <td className="py-3 text-xs font-semibold text-zinc-500">{fmtDate(session.createdAt)}</td>
+                            <td className="py-3 text-xs font-semibold text-zinc-500">{fmtDate(session.lastSeen)}</td>
+                            <td className="py-3 text-right text-xs font-bold text-zinc-400">{duration}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1304,45 +1331,125 @@ export default function AdminPage() {
           )}
         </section>
       </div>
+      {adminSelectedQuote && (
+        <AdminQuoteModal quote={adminSelectedQuote} onClose={() => setAdminSelectedQuote(null)} />
+      )}
     </main>
   );
 }
 
-function QuotesTable({ rows }: { rows: AdminStats['recentActivity']['quotes'] }) {
+function AdminQuoteModal({ quote, onClose }: { quote: AdminStats['recentActivity']['quotes'][0]; onClose: () => void }) {
+  return (
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(17,24,39,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 520, background: '#fff', borderRadius: 18, boxShadow: '0 24px 80px rgba(0,0,0,.28)', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f0ef', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 800, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.12em' }}>{fmtDate(quote.createdAt)}</p>
+            <h2 style={{ fontSize: 16, fontWeight: 900, color: '#09090b', marginTop: 2 }}>
+              {quote.originAddress || '—'} → {quote.destinationAddress || '—'}
+            </h2>
+          </div>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 10, border: 0, background: '#f4f4f5', fontSize: 18, fontWeight: 900, cursor: 'pointer', color: '#52525b' }}>×</button>
+        </div>
+        <div style={{ padding: '16px 20px', display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            {[
+              { lab: 'Preço', val: formatCurrencyBRL(quote.recommendedPrice), color: '#047857' },
+              { lab: 'Custo', val: formatCurrencyBRL(quote.totalCost), color: '#be123c' },
+              { lab: 'Lucro', val: formatCurrencyBRL(quote.profit), color: quote.profit >= 0 ? '#0369a1' : '#be123c' },
+            ].map((item) => (
+              <div key={item.lab} style={{ background: '#f9f9f8', borderRadius: 12, padding: '10px 12px' }}>
+                <p style={{ fontSize: 10, fontWeight: 800, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{item.lab}</p>
+                <p style={{ fontSize: 16, fontWeight: 900, color: item.color, marginTop: 3 }}>{item.val}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
+            {[
+              { lab: 'Distância', val: formatDistance(quote.distanceKm) },
+              { lab: 'Margem', val: `${quote.margin.toFixed(1)}%` },
+              { lab: 'Tipo', val: TRIP_TYPE_LABEL[quote.tripType] || quote.tripType },
+              { lab: 'Combustível', val: FUEL_LABEL[quote.fuelType] || quote.fuelType },
+              { lab: 'Modo de rota', val: quote.routeMode === 'automatic' ? 'Automático' : 'Manual' },
+            ].map((item) => (
+              <div key={item.lab} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f4f4f5' }}>
+                <span style={{ color: '#71717a', fontWeight: 700 }}>{item.lab}</span>
+                <span style={{ fontWeight: 800, color: '#09090b' }}>{item.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuotesTable({ rows, onSelect, page, totalPages, onPageChange }: {
+  rows: AdminStats['recentActivity']['quotes'];
+  onSelect?: (quote: AdminStats['recentActivity']['quotes'][0]) => void;
+  page?: number;
+  totalPages?: number;
+  onPageChange?: (p: number) => void;
+}) {
   if (!rows.length) return <EmptyState>Nenhuma cotacao registrada ainda.</EmptyState>;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
-            <th className="py-3 text-left">Data</th>
-            <th className="py-3 text-left">Rota</th>
-            <th className="py-3 text-right">Distancia</th>
-            <th className="py-3 text-right">Preco</th>
-            <th className="py-3 text-right">Custo</th>
-            <th className="py-3 text-right">Lucro</th>
-            <th className="py-3 text-right">Margem</th>
-            <th className="py-3 text-left">Tipo</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {rows.map((quote) => (
-            <tr key={quote.id} className="align-top">
-              <td className="whitespace-nowrap py-3 pr-4 text-xs font-bold text-zinc-400">{fmtDate(quote.createdAt)}</td>
-              <td className="max-w-[260px] py-3 pr-4">
-                <p className="truncate font-bold text-zinc-800">{quote.originAddress || '-'}</p>
-                <p className="truncate text-xs font-semibold text-zinc-400">para {quote.destinationAddress || '-'}</p>
-              </td>
-              <td className="whitespace-nowrap py-3 text-right font-bold text-zinc-600">{formatDistance(quote.distanceKm)}</td>
-              <td className="whitespace-nowrap py-3 text-right font-black text-emerald-700">{formatCurrencyBRL(quote.recommendedPrice)}</td>
-              <td className="whitespace-nowrap py-3 text-right font-bold text-rose-600">{formatCurrencyBRL(quote.totalCost)}</td>
-              <td className="whitespace-nowrap py-3 text-right font-bold text-sky-700">{formatCurrencyBRL(quote.profit)}</td>
-              <td className="whitespace-nowrap py-3 text-right font-bold text-zinc-700">{quote.margin.toFixed(1)}%</td>
-              <td className="whitespace-nowrap py-3 pl-4 font-semibold text-zinc-500">{TRIP_TYPE_LABEL[quote.tripType] || quote.tripType}</td>
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[820px] text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 text-xs font-black uppercase tracking-[0.12em] text-zinc-400">
+              <th className="py-3 text-left">Data</th>
+              <th className="py-3 text-left">Rota</th>
+              <th className="py-3 text-right">Distancia</th>
+              <th className="py-3 text-right">Preco</th>
+              <th className="py-3 text-right">Custo</th>
+              <th className="py-3 text-right">Lucro</th>
+              <th className="py-3 text-right">Margem</th>
+              <th className="py-3 text-left">Tipo</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {rows.map((quote) => (
+              <tr
+                key={quote.id}
+                className="align-top cursor-pointer hover:bg-zinc-50 transition-colors"
+                onClick={() => onSelect?.(quote)}
+              >
+                <td className="whitespace-nowrap py-3 pr-4 text-xs font-bold text-zinc-400">{fmtDate(quote.createdAt)}</td>
+                <td className="max-w-[260px] py-3 pr-4">
+                  <p className="truncate font-bold text-zinc-800">{quote.originAddress || '-'}</p>
+                  <p className="truncate text-xs font-semibold text-zinc-400">para {quote.destinationAddress || '-'}</p>
+                </td>
+                <td className="whitespace-nowrap py-3 text-right font-bold text-zinc-600">{formatDistance(quote.distanceKm)}</td>
+                <td className="whitespace-nowrap py-3 text-right font-black text-emerald-700">{formatCurrencyBRL(quote.recommendedPrice)}</td>
+                <td className="whitespace-nowrap py-3 text-right font-bold text-rose-600">{formatCurrencyBRL(quote.totalCost)}</td>
+                <td className="whitespace-nowrap py-3 text-right font-bold text-sky-700">{formatCurrencyBRL(quote.profit)}</td>
+                <td className="whitespace-nowrap py-3 text-right font-bold text-zinc-700">{quote.margin.toFixed(1)}%</td>
+                <td className="whitespace-nowrap py-3 pl-4 font-semibold text-zinc-500">{TRIP_TYPE_LABEL[quote.tripType] || quote.tripType}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totalPages && totalPages > 1 && onPageChange && page && (
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4">
+          <button
+            onClick={() => onPageChange(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-black text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"
+          >
+            ← Anterior
+          </button>
+          <span className="text-xs font-bold text-zinc-400">{page} / {totalPages}</span>
+          <button
+            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+            disabled={page === totalPages}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-black text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
