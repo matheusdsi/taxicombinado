@@ -75,8 +75,11 @@ export default function ParceirosPage() {
   }, [selectedCategory]);
 
   const handlePartnerClick = async (partner: Partner, url: string, source: string, partnerLocationId?: string) => {
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win) {
+      window.location.href = url;
+    }
     await trackPartnerClick(partner.id, source, partnerLocationId);
-    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const renderContactButtons = (
