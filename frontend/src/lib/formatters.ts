@@ -28,6 +28,9 @@ export function formatDistance(km: number): string {
  * e.g., 45 -> "45min"
  */
 export function formatDuration(minutes: number): string {
+  if (minutes <= 0) {
+    return '0min';
+  }
   if (minutes < 60) {
     return `${Math.round(minutes)}min`;
   }
@@ -134,9 +137,11 @@ export function generateWhatsAppText(params: {
   }
 
   text += `🗺️ *Distância:* ${formatDistance(distanceKm)}\n`;
-  text += `⏱️ *Tempo estimado:* ${formatDuration(estimatedMinutes)}\n`;
+  if (estimatedMinutes > 0) {
+    text += `⏱️ *Tempo estimado:* ${formatDuration(estimatedMinutes)}\n`;
+  }
   text += `🔄 *Tipo:* ${tripLabels[tripType] || tripType}\n\n`;
-  text += `💰 *Preço recomendado: ${formatCurrencyBRL(recommendedPrice)}*\n\n`;
+  text += `💰 *Preço estimado: ${formatCurrencyBRL(recommendedPrice)}*\n\n`;
   text += `Calculado com Taxi Combinado - taxicombinado.com.br`;
 
   return encodeURIComponent(text);

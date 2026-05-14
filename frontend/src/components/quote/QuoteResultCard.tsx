@@ -64,7 +64,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       destinationAddress && `🏁 Destino: ${destinationAddress}`,
       `🗺️ Distância: ${formatDistance(result.distanceKm)}`,
       '',
-      `💰 Preço recomendado: ${formatCurrencyBRL(result.recommendedPrice)}`,
+      `💰 Preço estimado: ${formatCurrencyBRL(result.recommendedPrice)}`,
       `📊 Custo da corrida: ${formatCurrencyBRL(result.totalCost)}`,
       `✅ Lucro estimado: ${formatCurrencyBRL(profitRecommended)}`,
       '',
@@ -95,7 +95,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       {/* ─── Hero amarelo ─── */}
       <div className="tc-hero-yellow">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(17,24,39,.7)' }}>Preço recomendado</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(17,24,39,.7)' }}>Preço estimado</span>
           <span style={{ background: 'rgba(17,24,39,.1)', color: 'var(--ink)', padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>
             Lucro {Math.round(result.margin)}%
           </span>
