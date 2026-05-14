@@ -104,7 +104,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
           R$ {rec.int}<span className="cents">,{rec.dec}</span>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(17,24,39,.65)', marginTop: 6 }}>
-          Com base no taxímetro, no ganho escolhido e nos custos informados.
+          Com base no taxímetro estimado (inclui ~30% do tempo de rota como parado em trânsito/semáforos), no ganho escolhido e nos custos informados.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
