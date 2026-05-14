@@ -156,7 +156,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       consumptionKmPerLiter: 11,
       fuelPricePerLiter: 6.29,
       fuelType: 'gasoline',
-      vehicleExtraCostPerKm: 0.8,
+      vehicleExtraCostPerKm: 0,
       baseFare: PRESETS.comum.baseFare,
       pricePerKm: PRESETS.comum.pricePerKm,
       hasWaiting: false,
@@ -275,7 +275,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       const response = await calculateQuote({
         ...data,
         estimatedMinutes: estimatedWaitingMinutes,
-        vehicleExtraCostPerKm: data.vehicleExtraCostPerKm,
+        vehicleExtraCostPerKm: 0,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
         stops: [],
@@ -456,9 +456,6 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
           )} />
           <Controller name="extraCosts" control={control} render={({ field }) => (
             <MoneyInput label="Outros custos" value={field.value} onChange={field.onChange} />
-          )} />
-          <Controller name="vehicleExtraCostPerKm" control={control} render={({ field }) => (
-            <MoneyInput label="Custo do carro/km" value={field.value} onChange={field.onChange} />
           )} />
         </div>
       </Section>
