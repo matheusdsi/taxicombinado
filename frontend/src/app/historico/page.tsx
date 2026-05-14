@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { getQuoteHistory } from '@/lib/api';
 import { formatCurrencyBRL, formatDistance } from '@/lib/formatters';
@@ -12,13 +12,30 @@ interface HistoryQuote {
   id: string;
   createdAt: string;
   recommendedPrice: number;
+  farePrice?: number;
+  minimumPrice?: number;
+  idealPrice?: number;
   originAddress?: string;
   destinationAddress?: string;
   distanceKm: number;
+  returnDistanceKm?: number;
+  totalDistanceKm?: number;
+  estimatedMinutes?: number;
   tripType: string;
   totalCost: number;
+  fuelCost?: number;
+  vehicleExtraCost?: number;
+  tollTotal?: number;
+  parkingCost?: number;
+  extraCosts?: number;
+  timeCharge?: number;
+  desiredMarginPercent?: number;
+  customChargedPrice?: number;
+  fuelPricePerLiter?: number;
+  consumptionKmPerLiter?: number;
   profit: number;
   margin: number;
+  alerts?: Array<{ message: string; severity: string }>;
   isLocal?: boolean;
 }
 
@@ -35,12 +52,131 @@ function formatDate(iso: string) {
   });
 }
 
+function routeTitle(quote: HistoryQuote) {
+  if (quote.originAddress || quote.destinationAddress) {
+    return `${quote.originAddress || 'Origem'} -> ${quote.destinationAddress || 'Destino'}`;
+  }
+  return `${formatDistance(quote.totalDistanceKm || quote.distanceKm)} - ${tripTypeLabels[quote.tripType] || quote.tripType}`;
+}
+
+function shortDate(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function DetailLine({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: '8px 0', borderBottom: '1px solid var(--gray-100)' }}>
+      <span style={{ fontSize: 13, color: 'var(--gray-500)', fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: strong ? 900 : 800, textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
+
+function Pill({ children, tone = 'gray' }: { children: ReactNode; tone?: 'gray' | 'green' | 'yellow' | 'red' }) {
+  const colors = {
+    gray: { bg: 'var(--gray-100)', color: 'var(--gray-700)' },
+    green: { bg: 'var(--green-soft)', color: 'var(--green)' },
+    yellow: { bg: 'var(--yellow-soft)', color: 'var(--ink)' },
+    red: { bg: 'var(--red-soft)', color: 'var(--red)' },
+  }[tone];
+  return <span style={{ background: colors.bg, color: colors.color, borderRadius: 999, padding: '5px 9px', fontSize: 11, fontWeight: 900 }}>{children}</span>;
+}
+
+function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: () => void }) {
+  const taximeter = quote.farePrice || 0;
+  const gainOverTaximeter = Math.max(0, quote.recommendedPrice - taximeter);
+  const shownPrice = quote.customChargedPrice && quote.customChargedPrice > 0 ? quote.customChargedPrice : quote.recommendedPrice;
+  const totalDistance = quote.totalDistanceKm || quote.distanceKm;
+  const costLines = [
+    ['Combustivel', quote.fuelCost],
+    ['Desgaste do carro', quote.vehicleExtraCost],
+    ['Pedagio', quote.tollTotal],
+    ['Estacionamento', quote.parkingCost],
+    ['Outros gastos', quote.extraCosts],
+  ].filter(([, value]) => Number(value) > 0) as [string, number][];
+
+  return (
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(17,24,39,.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 12 }}>
+      <div style={{ width: '100%', maxWidth: 620, maxHeight: '88vh', overflow: 'auto', background: 'var(--surface)', borderRadius: 22, boxShadow: '0 24px 80px rgba(0,0,0,.28)' }}>
+        <div style={{ position: 'sticky', top: 0, background: 'var(--surface)', borderBottom: '1px solid var(--gray-100)', padding: 16, zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <Pill tone="yellow">{tripTypeLabels[quote.tripType] || quote.tripType}</Pill>
+                <Pill>{shortDate(quote.createdAt)}</Pill>
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 900, color: 'var(--ink)', lineHeight: 1.2 }}>{routeTitle(quote)}</h2>
+            </div>
+            <button type="button" onClick={onClose} aria-label="Fechar detalhes" style={{ width: 36, height: 36, border: 0, borderRadius: 12, background: 'var(--gray-100)', color: 'var(--gray-700)', fontSize: 20, fontWeight: 900, cursor: 'pointer', flexShrink: 0 }}>x</button>
+          </div>
+        </div>
+
+        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+          <div style={{ background: 'var(--yellow-soft)', borderRadius: 18, padding: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(17,24,39,.65)' }}>Valor para passar ao cliente</div>
+            <div style={{ fontSize: 34, fontWeight: 950, letterSpacing: '-0.04em', color: 'var(--ink)', marginTop: 2 }}>{formatCurrencyBRL(shownPrice)}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+              <div style={{ background: 'rgba(17,24,39,.08)', borderRadius: 12, padding: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(17,24,39,.55)' }}>SOBRA PARA VOCE</div>
+                <div style={{ fontSize: 17, fontWeight: 900, color: quote.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>{formatCurrencyBRL(quote.profit)}</div>
+              </div>
+              <div style={{ background: 'rgba(17,24,39,.08)', borderRadius: 12, padding: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(17,24,39,.55)' }}>PRECO POR KM</div>
+                <div style={{ fontSize: 17, fontWeight: 900 }}>{formatCurrencyBRL(shownPrice / Math.max(1, totalDistance))}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="tc-card" style={{ margin: 0 }}>
+            <div className="tc-section-title">Como esse valor foi montado</div>
+            <DetailLine label="Taximetro calculado" value={taximeter > 0 ? formatCurrencyBRL(taximeter) : 'Nao informado'} />
+            <DetailLine label="Ganho colocado em cima" value={gainOverTaximeter > 0 ? formatCurrencyBRL(gainOverTaximeter) : 'Sem acrescimo'} />
+            <DetailLine label="Minimo para nao pagar pra trabalhar" value={quote.minimumPrice ? formatCurrencyBRL(quote.minimumPrice) : formatCurrencyBRL(quote.totalCost)} />
+            {quote.idealPrice && <DetailLine label="Com folga melhor" value={formatCurrencyBRL(quote.idealPrice)} />}
+          </div>
+
+          <div className="tc-card" style={{ margin: 0 }}>
+            <div className="tc-section-title">O que pesou nessa corrida</div>
+            {costLines.length > 0 ? costLines.map(([label, value]) => (
+              <DetailLine key={label} label={label} value={formatCurrencyBRL(value)} />
+            )) : (
+              <p style={{ fontSize: 13, color: 'var(--gray-500)', fontWeight: 700 }}>Essa cotacao antiga nao guardou a abertura dos custos.</p>
+            )}
+            {quote.timeCharge && quote.timeCharge > 0 && <DetailLine label="Espera/parado cobrada" value={formatCurrencyBRL(quote.timeCharge)} />}
+            <DetailLine label="Gasto total estimado" value={formatCurrencyBRL(quote.totalCost)} strong />
+          </div>
+
+          <div className="tc-card" style={{ margin: 0 }}>
+            <div className="tc-section-title">Dados usados</div>
+            <DetailLine label="Distancia total" value={formatDistance(totalDistance)} />
+            {quote.returnDistanceKm && quote.returnDistanceKm > 0 && <DetailLine label="Volta considerada" value={formatDistance(quote.returnDistanceKm)} />}
+            {quote.estimatedMinutes && quote.estimatedMinutes > 0 && <DetailLine label="Tempo de espera" value={`${Math.round(quote.estimatedMinutes / 60 * 10) / 10} h`} />}
+            {quote.fuelPricePerLiter && quote.fuelPricePerLiter > 0 && <DetailLine label="Combustivel informado" value={formatCurrencyBRL(quote.fuelPricePerLiter)} />}
+            {quote.consumptionKmPerLiter && quote.consumptionKmPerLiter > 0 && <DetailLine label="Consumo do carro" value={`${quote.consumptionKmPerLiter} km/l`} />}
+          </div>
+
+          {quote.alerts && quote.alerts.length > 0 && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {quote.alerts.map((alert, index) => (
+                <div key={index} style={{ background: alert.severity === 'error' ? 'var(--red-soft)' : 'var(--orange-soft)', borderRadius: 14, padding: 12, fontSize: 13, fontWeight: 800, color: alert.severity === 'error' ? 'var(--red)' : '#7C2D12' }}>
+                  {alert.message}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HistoricoPage() {
   const { driver } = useAuth();
   const [quotes, setQuotes] = useState<HistoryQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedQuote, setSelectedQuote] = useState<HistoryQuote | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -121,8 +257,11 @@ export default function HistoricoPage() {
       {!loading && quotes.length > 0 && (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {quotes.map((quote) => (
-              <div key={quote.id} className="tc-card" style={{ padding: 14 }}>
+            {quotes.map((quote) => {
+              const shownPrice = quote.customChargedPrice && quote.customChargedPrice > 0 ? quote.customChargedPrice : quote.recommendedPrice;
+              const totalDistance = quote.totalDistanceKm || quote.distanceKm;
+              return (
+              <button key={quote.id} type="button" onClick={() => setSelectedQuote(quote)} className="tc-card" style={{ padding: 14, border: '1px solid var(--gray-100)', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', width: '100%', background: 'var(--surface)' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {quote.originAddress || quote.destinationAddress ? (
@@ -140,10 +279,10 @@ export default function HistoricoPage() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
-                      {formatCurrencyBRL(quote.recommendedPrice)}
+                      {formatCurrencyBRL(shownPrice)}
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: quote.profit >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 2 }}>
-                      {quote.profit >= 0 ? '+' : ''}{formatCurrencyBRL(quote.profit)} lucro
+                      {quote.profit >= 0 ? '+' : ''}{formatCurrencyBRL(quote.profit)} sobra
                     </div>
                   </div>
                 </div>
@@ -156,7 +295,7 @@ export default function HistoricoPage() {
                   <span>Custo: {formatCurrencyBRL(quote.totalCost)}</span>
                   <span style={{ color: 'var(--gray-200)' }}>·</span>
                   <span style={{ fontWeight: 700, color: quote.margin >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {quote.margin.toFixed(1)}% margem
+                    {quote.margin.toFixed(1)}% lucro
                   </span>
                   {quote.isLocal && (
                     <>
@@ -165,8 +304,34 @@ export default function HistoricoPage() {
                     </>
                   )}
                 </div>
-              </div>
-            ))}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gray-400)' }}>RODOU</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--gray-700)' }}>{formatDistance(totalDistance)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gray-400)' }}>GASTOU</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--gray-700)' }}>{formatCurrencyBRL(quote.totalCost)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--gray-400)' }}>POR KM</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--gray-700)' }}>{formatCurrencyBRL(shownPrice / Math.max(1, totalDistance))}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <Pill>{tripTypeLabels[quote.tripType] || quote.tripType}</Pill>
+                    {quote.timeCharge && quote.timeCharge > 0 ? <Pill tone="yellow">Com espera</Pill> : null}
+                    {quote.profit < 0 ? <Pill tone="red">Deu prejuizo</Pill> : <Pill tone="green">Sobrou dinheiro</Pill>}
+                    {quote.isLocal && <Pill>Local</Pill>}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--gray-400)', flexShrink: 0 }}>Ver detalhes</span>
+                </div>
+              </button>
+            );
+            })}
           </div>
 
           {totalPages > 1 && (
@@ -183,6 +348,10 @@ export default function HistoricoPage() {
             </div>
           )}
         </>
+      )}
+
+      {selectedQuote && (
+        <QuoteDetailModal quote={selectedQuote} onClose={() => setSelectedQuote(null)} />
       )}
     </PageContainer>
   );

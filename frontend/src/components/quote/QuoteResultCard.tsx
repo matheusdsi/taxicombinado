@@ -34,16 +34,25 @@ function CostRow({ label, value, bold = false }: { label: string; value: number;
   );
 }
 
+function MoneyLine({ label, value, tone }: { label: string; value: number; tone?: 'green' | 'red' | 'ink' }) {
+  const color = tone === 'green' ? 'var(--green)' : tone === 'red' ? 'var(--red)' : 'var(--ink)';
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--gray-100)' }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-500)' }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 900, color }}>{formatCurrencyBRL(value)}</span>
+    </div>
+  );
+}
+
 export function QuoteResultCard({ result, quoteId, originAddress, destinationAddress, routeSteps = [], onNewQuote }: QuoteResultCardProps) {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
 
   const profitRecommended = result.profit;
-  const profitIdeal = result.idealPrice - result.totalCost;
-  const marginIdeal = result.idealPrice > 0 ? (profitIdeal / result.idealPrice) * 100 : 0;
   const lucroPositivo = profitRecommended > 0;
   const rec = splitMoney(result.recommendedPrice);
+  const gainOverTaximeter = Math.max(0, result.recommendedPrice - result.farePrice);
 
   const tripLabel = result.tripType === 'one_way' ? 'Só ida' : result.tripType === 'round_trip' ? 'Ida e volta' : 'Volta vazia';
 
@@ -110,6 +119,14 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="tc-card">
+        <div className="tc-section-title">Resumo no bolso</div>
+        <MoneyLine label="Taximetro da corrida" value={result.farePrice} />
+        {gainOverTaximeter > 0 && <MoneyLine label="Ganho colocado em cima" value={gainOverTaximeter} />}
+        <MoneyLine label="Gasto para fazer a corrida" value={result.totalCost} />
+        <MoneyLine label="Sobra estimada para voce" value={profitRecommended} tone={profitRecommended >= 0 ? 'green' : 'red'} />
       </div>
 
       {/* ─── Ações rápidas ─── */}
@@ -214,7 +231,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       <div className="tc-card" style={{ padding: 0, overflow: 'hidden' }}>
         <button type="button" onClick={() => setShowDetails(!showDetails)}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: 0, background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' as const }}>
-          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Detalhamento de custos</span>
+          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Para onde vai o dinheiro</span>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
             style={{ transform: showDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--gray-400)' }}>
             <path d="M19 9l-7 7-7-7"/>
@@ -224,12 +241,13 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
           <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--gray-100)' }}>
             <div style={{ paddingTop: 12 }}>
               <CostRow label="Combustível"     value={result.fuelCost} />
-              {result.vehicleExtraCost > 0 && <CostRow label="Custo do carro" value={result.vehicleExtraCost} />}
-              {result.tollTotal > 0    && <CostRow label="Pedágios"         value={result.tollTotal} />}
+              {result.vehicleExtraCost > 0 && <CostRow label="Desgaste do carro" value={result.vehicleExtraCost} />}
+              {result.tollTotal > 0    && <CostRow label="Pedágio"         value={result.tollTotal} />}
               {result.parkingCost > 0  && <CostRow label="Estacionamento"   value={result.parkingCost} />}
-              {result.extraCosts > 0   && <CostRow label="Outras taxas"     value={result.extraCosts} />}
+              {result.extraCosts > 0   && <CostRow label="Outros gastos"     value={result.extraCosts} />}
+              {result.timeCharge > 0   && <CostRow label="Espera cobrada do cliente" value={result.timeCharge} />}
               <div style={{ height: 1, background: 'var(--gray-200)', margin: '8px 0' }}/>
-              <CostRow label="Total de custos" value={result.totalCost} bold />
+              <CostRow label="Total que sai do seu bolso" value={result.totalCost} bold />
             </div>
           </div>
         )}

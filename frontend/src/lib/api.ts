@@ -126,7 +126,35 @@ export async function calculateRoute(origin: string, destination: string): Promi
 }
 
 export async function getQuoteHistory(params?: { limit?: number; page?: number }): Promise<{
-  quotes: Array<{ id: string; createdAt: string; recommendedPrice: number; originAddress?: string; destinationAddress?: string; distanceKm: number; tripType: string; totalCost: number; profit: number; margin: number }>;
+  quotes: Array<{
+    id: string;
+    createdAt: string;
+    recommendedPrice: number;
+    farePrice?: number;
+    minimumPrice?: number;
+    idealPrice?: number;
+    originAddress?: string;
+    destinationAddress?: string;
+    distanceKm: number;
+    returnDistanceKm?: number;
+    totalDistanceKm?: number;
+    estimatedMinutes?: number;
+    tripType: string;
+    totalCost: number;
+    fuelCost?: number;
+    vehicleExtraCost?: number;
+    tollTotal?: number;
+    parkingCost?: number;
+    extraCosts?: number;
+    timeCharge?: number;
+    desiredMarginPercent?: number;
+    customChargedPrice?: number;
+    fuelPricePerLiter?: number;
+    consumptionKmPerLiter?: number;
+    profit: number;
+    margin: number;
+    alerts?: Array<{ message: string; severity: string }>;
+  }>;
   total: number;
   page: number;
   totalPages: number;
