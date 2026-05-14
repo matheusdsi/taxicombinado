@@ -16,6 +16,7 @@ const categories = [
 const categoryLabels: Record<string, string> = {
   fuel_station: 'Postos',
   mechanic: 'Oficina',
+  oficina: 'Oficina',
   car_wash: 'Lavagem',
   toll_tag: 'Tag Pedágio',
   vehicle_protection: 'Proteção Veicular',
@@ -24,6 +25,7 @@ const categoryLabels: Record<string, string> = {
 const categoryInitials: Record<string, string> = {
   fuel_station: 'PT',
   mechanic: 'OF',
+  oficina: 'OF',
   car_wash: 'LV',
   toll_tag: 'TP',
   vehicle_protection: 'SG',
@@ -39,6 +41,10 @@ function buildWhatsAppUrl(phone: string, partnerName: string) {
 
 function bySortOrder<T extends { sortOrder?: number; name: string }>(a: T, b: T) {
   return (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, 'pt-BR');
+}
+
+function normalizeCategoryKey(category: string) {
+  return category.trim().toLowerCase();
 }
 
 export default function ParceirosPage() {
@@ -183,7 +189,7 @@ export default function ParceirosPage() {
                 color: partner.isPremium ? 'var(--ink)' : 'var(--gray-700)',
                 display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 14,
               }}>
-                {categoryInitials[partner.category] || partner.name.slice(0, 2).toUpperCase()}
+                {categoryInitials[normalizeCategoryKey(partner.category)] || partner.name.slice(0, 2).toUpperCase()}
               </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -194,7 +200,7 @@ export default function ParceirosPage() {
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--gray-500)', marginBottom: 6 }}>
-                  {categoryLabels[partner.category] || partner.category}
+                  {categoryLabels[normalizeCategoryKey(partner.category)] || partner.category}
                   {partner.city && ` · ${partner.city}`}
                 </div>
                 {partner.description && (

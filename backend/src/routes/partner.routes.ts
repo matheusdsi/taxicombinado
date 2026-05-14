@@ -5,14 +5,30 @@ import { ZodError } from 'zod';
 
 const router = Router();
 
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  fuel_station: ['fuel_station', 'posto', 'postos', 'posto de combustivel', 'posto de combustível'],
+  mechanic: ['mechanic', 'oficina', 'oficinas', 'mecanico', 'mecânico', 'mecanica', 'mecânica'],
+  car_wash: ['car_wash', 'lavagem', 'lava rapido', 'lava rápido', 'lava-rapido', 'lava-rápido'],
+  toll_tag: ['toll_tag', 'tag pedagio', 'tag pedágio', 'pedagio', 'pedágio'],
+  vehicle_protection: ['vehicle_protection', 'seguro', 'protecao veicular', 'proteção veicular'],
+};
+
+function normalizeCategory(value: string) {
+  return value.trim().toLowerCase();
+}
+
 // GET /api/partners
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
 
-    const where: { isActive: boolean; category?: string } = { isActive: true };
+    const where: { isActive: boolean; category?: { in: string[]; mode: 'insensitive' } } = { isActive: true };
     if (category && typeof category === 'string') {
-      where.category = category;
+      const normalizedCategory = normalizeCategory(category);
+      where.category = {
+        in: CATEGORY_ALIASES[normalizedCategory] ?? [category],
+        mode: 'insensitive',
+      };
     }
 
     const partners = await prisma.partner.findMany({
