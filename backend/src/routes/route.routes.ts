@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getMapProvider } from '../lib/maps';
+import { createRouteCacheKey, getCachedRoute } from '../lib/routeCache';
 import { routeCalculateSchema } from '../schemas/quote.schema';
 import { ZodError } from 'zod';
 import { getFlags } from '../lib/featureFlags';
@@ -13,11 +14,14 @@ router.post('/calculate', async (req: Request, res: Response) => {
     const provider = getMapProvider();
 
     if (provider.isAvailable() && (provider as { constructor: { name: string } }).constructor.name !== 'ManualProvider') {
-      const result = await provider.calculateRoute({
+      const routeRequest = {
         origin: input.origin,
         destination: input.destination,
         waypoints: input.waypoints,
-      });
+      };
+      const providerName = (provider as { constructor: { name: string } }).constructor.name;
+      const cacheKey = createRouteCacheKey(providerName, routeRequest);
+      const { result, cacheStatus } = await getCachedRoute(cacheKey, () => provider.calculateRoute(routeRequest));
 
       const { showRouteSteps } = getFlags();
       return res.json({
@@ -28,6 +32,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
           polyline: result.polyline,
           provider: result.provider,
           steps: showRouteSteps ? (result.steps ?? []) : [],
+          cache: cacheStatus,
         },
       });
     }
