@@ -308,12 +308,6 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       {/* ─── Hero dark ─── */}
       <div className="tc-hero-dark" style={{ marginBottom: 20 }}>
         <div style={{ position: 'absolute', right: -30, top: -30, width: 140, height: 140, borderRadius: '50%', background: 'var(--yellow)', opacity: 0.15 }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 800 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--yellow)', color: 'var(--ink)', display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 16, boxShadow: 'inset 0 -2px 0 rgba(0,0,0,.08)' }}>T</div>
-            <span>Táxi Combinado</span>
-          </div>
-        </div>
         <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2, maxWidth: 270 }}>
           Calcule quanto cobrar{' '}
           <span style={{ color: 'var(--yellow)' }}>sem sair no prejuízo.</span>

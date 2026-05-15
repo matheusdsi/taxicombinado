@@ -57,7 +57,7 @@ export default function HomePage() {
   return (
     <PageContainer>
       {!result && (
-        <div className="mb-4 grid gap-3">
+        <div className="mb-4">
           <Link
             href="/minha-meta"
             onClick={() => trackCtaClick('home_goal', { placement: 'home_top_card' })}
@@ -71,21 +71,6 @@ export default function HomePage() {
               </div>
             </div>
             <span className="text-lg text-gray-400 transition-transform group-hover:translate-x-0.5">→</span>
-          </Link>
-
-          <Link
-            href="/agendar"
-            onClick={() => trackCtaClick('home_schedule_ride', { placement: 'home_top_card' })}
-            className="flex items-center justify-between bg-taxi-50 border border-taxi-200 rounded-2xl px-4 py-3 hover:bg-taxi-100 transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-taxi-100 text-sm font-black text-taxi-700">TX</span>
-              <div>
-                <p className="text-sm font-semibold text-taxi-800">Precisa de um táxi?</p>
-                <p className="text-xs text-taxi-600">Agende sua corrida com antecedência</p>
-              </div>
-            </div>
-            <span className="text-taxi-500 text-lg group-hover:translate-x-0.5 transition-transform">→</span>
           </Link>
         </div>
       )}

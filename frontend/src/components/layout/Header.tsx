@@ -113,18 +113,38 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-2">
-            {!loading && driver && (
-              <span className="hidden sm:block text-xs text-gray-400 max-w-[130px] truncate">
-                Olá, {driver.name || driver.email.split('@')[0]}
-              </span>
-            )}
-            {!loading && !driver && (
+            <Link
+              href="/agendar"
+              onClick={() => trackCtaClick('header_schedule', { placement: 'header' })}
+              className="flex items-center gap-1.5 text-xs font-semibold bg-taxi-500 text-gray-900 px-3 py-1.5 rounded-full hover:bg-taxi-600 transition-colors shrink-0"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <path d="M16 2v4M8 2v4M3 10h18"/>
+              </svg>
+              Agendar
+            </Link>
+
+            {!loading && driver ? (
               <Link
-                href="/cadastro"
-                onClick={() => trackCtaClick('header_signup', { placement: 'header' })}
-                className="text-xs bg-taxi-500 text-white px-3 py-1.5 rounded-full hover:bg-taxi-600 transition-colors"
+                href="/minha-conta"
+                onClick={() => trackCtaClick('header_avatar', { placement: 'header' })}
+                title={driver.name || driver.email}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-taxi-500 text-xs font-black shrink-0 hover:opacity-80 transition-opacity"
               >
-                Criar conta
+                {(driver.name || driver.email).charAt(0).toUpperCase()}
+              </Link>
+            ) : !loading && (
+              <Link
+                href="/entrar"
+                onClick={() => trackCtaClick('header_avatar_guest', { placement: 'header' })}
+                title="Entrar na conta"
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500 shrink-0 hover:bg-gray-200 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="4"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
               </Link>
             )}
           </div>
