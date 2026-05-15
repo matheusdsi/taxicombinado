@@ -117,6 +117,18 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+      {/* ─── Nova cotação (topo) ─── */}
+      <button type="button" onClick={() => {
+        trackEvent('quote_recalculate_clicked', { quote_id: quoteId, position: 'top' });
+        onNewQuote();
+      }}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--gray-100)', color: 'var(--gray-700)', border: 0, borderRadius: 14, padding: '11px 16px', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+        Nova cotação
+      </button>
+
       {/* ─── Hero amarelo ─── */}
       <div className="tc-hero-yellow">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
