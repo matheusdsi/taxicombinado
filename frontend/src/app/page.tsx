@@ -56,19 +56,35 @@ export default function HomePage() {
   return (
     <PageContainer>
       {!result && (
-        <Link
-          href="/agendar"
-          className="flex items-center justify-between bg-taxi-50 border border-taxi-200 rounded-2xl px-4 py-3 mb-4 hover:bg-taxi-100 transition-colors group"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-xl">🚖</span>
-            <div>
-              <p className="text-sm font-semibold text-taxi-800">Precisa de um táxi?</p>
-              <p className="text-xs text-taxi-600">Agende sua corrida com antecedência</p>
+        <div className="mb-4 grid gap-3">
+          <Link
+            href="/minha-meta"
+            className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-gray-50 group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-gray-900 text-sm font-black text-taxi-500">R$</span>
+              <div>
+                <p className="text-sm font-extrabold text-gray-900">Você sabe quanto precisa fazer por dia?</p>
+                <p className="text-xs font-semibold text-gray-500">Cadastre seus custos e veja sua meta mínima diária.</p>
+              </div>
             </div>
-          </div>
-          <span className="text-taxi-500 text-lg group-hover:translate-x-0.5 transition-transform">→</span>
-        </Link>
+            <span className="text-lg text-gray-400 transition-transform group-hover:translate-x-0.5">→</span>
+          </Link>
+
+          <Link
+            href="/agendar"
+            className="flex items-center justify-between bg-taxi-50 border border-taxi-200 rounded-2xl px-4 py-3 hover:bg-taxi-100 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-taxi-100 text-sm font-black text-taxi-700">TX</span>
+              <div>
+                <p className="text-sm font-semibold text-taxi-800">Precisa de um táxi?</p>
+                <p className="text-xs text-taxi-600">Agende sua corrida com antecedência</p>
+              </div>
+            </div>
+            <span className="text-taxi-500 text-lg group-hover:translate-x-0.5 transition-transform">→</span>
+          </Link>
+        </div>
       )}
       {!result ? (
         <TaxiQuoteForm onResult={handleResult} />

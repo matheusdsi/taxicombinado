@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { QuoteResult, RouteStep } from '@/lib/api';
 import { formatCurrencyBRL, formatDistance, generateWhatsAppText } from '@/lib/formatters';
+import { getMyGoal, MyGoalData } from '@/lib/myGoal';
 
 interface QuoteResultCardProps {
   result: QuoteResult;
@@ -49,11 +51,19 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
+  const [goal, setGoal] = useState<MyGoalData | null>(null);
+
+  useEffect(() => {
+    setGoal(getMyGoal());
+  }, []);
 
   const profitRecommended = result.profit;
   const lucroPositivo = profitRecommended > 0;
   const rec = splitMoney(result.recommendedPrice);
   const gainOverTaximeter = Math.max(0, result.recommendedPrice - result.farePrice);
+  const tripPricePerKm = result.recommendedPrice / Math.max(1, result.totalDistanceKm || result.distanceKm);
+  const dailyGoalPercent = goal?.meta_diaria ? (result.recommendedPrice / goal.meta_diaria) * 100 : 0;
+  const missingAfterTrip = goal?.meta_diaria ? Math.max(0, goal.meta_diaria - result.recommendedPrice) : 0;
 
   const tripLabel = result.tripType === 'one_way' ? 'Só ida' : result.tripType === 'round_trip' ? 'Ida e volta' : 'Volta vazia';
 
@@ -128,8 +138,46 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
         <MoneyLine label="Taximetro da corrida" value={result.farePrice} />
         {gainOverTaximeter > 0 && <MoneyLine label="Ganho colocado em cima" value={gainOverTaximeter} />}
         <MoneyLine label="Gasto para fazer a corrida" value={result.totalCost} />
-        <MoneyLine label="Sobra estimada para voce" value={profitRecommended} tone={profitRecommended >= 0 ? 'green' : 'red'} />
+        <MoneyLine label="Sobra estimada para você" value={profitRecommended} tone={profitRecommended >= 0 ? 'green' : 'red'} />
       </div>
+
+      {/* ─── Impacto na meta ─── */}
+      {goal && goal.meta_diaria > 0 ? (
+        <div className="tc-card" style={{ background: 'var(--gray-50)' }}>
+          <div className="tc-section-title">Sua meta do dia</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <MoneyLine label={`Essa corrida representa ${dailyGoalPercent.toFixed(0)}% da sua meta diária`} value={result.recommendedPrice} />
+            <MoneyLine label="Depois dessa corrida, ainda falta" value={missingAfterTrip} tone={missingAfterTrip === 0 ? 'green' : 'ink'} />
+            <MoneyLine label="Essa corrida paga por km" value={tripPricePerKm} />
+            {goal.meta_por_km ? <MoneyLine label="Sua meta mínima por km" value={goal.meta_por_km} /> : null}
+          </div>
+          {goal.meta_por_km && tripPricePerKm < goal.meta_por_km && (
+            <div style={{ background: 'var(--orange-soft)', color: '#7C2D12', borderRadius: 12, padding: 11, fontSize: 13, fontWeight: 800, marginTop: 10 }}>
+              Atenção: essa corrida está abaixo da sua meta mínima por km.
+            </div>
+          )}
+          {result.recommendedPrice >= goal.meta_diaria && (
+            <div style={{ background: 'var(--green-soft)', color: 'var(--green)', borderRadius: 12, padding: 11, fontSize: 13, fontWeight: 800, marginTop: 10 }}>
+              Essa corrida sozinha já cobre sua meta diária.
+            </div>
+          )}
+          {profitRecommended > 0 && result.recommendedPrice < goal.meta_diaria && (
+            <div style={{ background: 'var(--yellow-soft)', color: 'var(--ink)', borderRadius: 12, padding: 11, fontSize: 13, fontWeight: 800, marginTop: 10 }}>
+              Essa corrida ajuda em {dailyGoalPercent.toFixed(0)}% da sua meta do dia.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="tc-card" style={{ background: 'linear-gradient(180deg, #FFFBEC, #FFF)', borderColor: '#FCEBA8' }}>
+          <div style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)' }}>Configure sua meta</div>
+          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 3, fontWeight: 700, lineHeight: 1.4 }}>
+            Configure sua meta para saber quanto essa corrida ajuda no seu dia.
+          </p>
+          <Link href="/minha-meta" style={{ display: 'inline-flex', marginTop: 10, background: 'var(--ink)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}>
+            Calcular minha meta
+          </Link>
+        </div>
+      )}
 
       {/* ─── Ações rápidas ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
