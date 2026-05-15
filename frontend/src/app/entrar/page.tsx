@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 export default function EntrarPage() {
   const router = useRouter();
@@ -18,13 +19,22 @@ export default function EntrarPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    trackEvent('login_attempt', {
+      method: 'email',
+    });
     try {
       await api.post('/api/auth/driver/login', { email, password });
       await refresh();
+      trackEvent('login', {
+        method: 'email',
+      });
       router.push('/historico');
       router.refresh();
     } catch (e: unknown) {
       const error = e as { response?: { data?: { error?: string } }; message?: string };
+      trackEvent('login_error', {
+        method: 'email',
+      });
       setError(error.response?.data?.error || error.message || 'Erro desconhecido');
     } finally {
       setLoading(false);

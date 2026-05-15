@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 export default function CadastroPage() {
   const router = useRouter();
@@ -31,13 +32,22 @@ export default function CadastroPage() {
     }
 
     setLoading(true);
+    trackEvent('sign_up_attempt', {
+      method: 'email',
+    });
     try {
       await api.post('/api/auth/driver/register', { name: form.name, email: form.email, password: form.password });
       await refresh();
+      trackEvent('sign_up', {
+        method: 'email',
+      });
       router.push('/historico');
       router.refresh();
     } catch (e: unknown) {
       const error = e as { response?: { data?: { error?: string } }; message?: string };
+      trackEvent('sign_up_error', {
+        method: 'email',
+      });
       setError(error.response?.data?.error || error.message || 'Erro desconhecido');
     } finally {
       setLoading(false);

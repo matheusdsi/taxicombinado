@@ -7,6 +7,7 @@ import { TaxiQuoteForm } from '@/components/quote/TaxiQuoteForm';
 import { QuoteResultCard } from '@/components/quote/QuoteResultCard';
 import { QuoteResult, RouteStep } from '@/lib/api';
 import { saveLocalQuote } from '@/lib/localQuotes';
+import { trackCtaClick } from '@/lib/analytics';
 
 interface FormSnapshot {
   originAddress?: string;
@@ -59,6 +60,7 @@ export default function HomePage() {
         <div className="mb-4 grid gap-3">
           <Link
             href="/minha-meta"
+            onClick={() => trackCtaClick('home_goal', { placement: 'home_top_card' })}
             className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-gray-50 group"
           >
             <div className="flex items-center gap-3">
@@ -73,6 +75,7 @@ export default function HomePage() {
 
           <Link
             href="/agendar"
+            onClick={() => trackCtaClick('home_schedule_ride', { placement: 'home_top_card' })}
             className="flex items-center justify-between bg-taxi-50 border border-taxi-200 rounded-2xl px-4 py-3 hover:bg-taxi-100 transition-colors group"
           >
             <div className="flex items-center gap-3">

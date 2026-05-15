@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { getPartners, trackPartnerClick, Partner, PartnerLocation } from '@/lib/api';
+import { trackCtaClick, trackEvent, trackPartnerClickEvent } from '@/lib/analytics';
 
 function PartnerThumb({ partner, initials }: { partner: Partner; initials: string }) {
   const [imgError, setImgError] = useState(false);
@@ -107,7 +108,24 @@ export default function ParceirosPage() {
     fetchPartners();
   }, [selectedCategory]);
 
-  const handlePartnerClick = async (partner: Partner, url: string, source: string, partnerLocationId?: string) => {
+  const handlePartnerClick = async (
+    partner: Partner,
+    target: Partner | PartnerLocation,
+    url: string,
+    action: 'phone' | 'whatsapp' | 'offer' | 'waze',
+    source: string,
+    partnerLocationId?: string
+  ) => {
+    trackPartnerClickEvent({
+      partnerId: partner.id,
+      partnerName: partner.name,
+      partnerCategory: partner.category,
+      action,
+      placement: 'partners_page',
+      partnerLocationId,
+      partnerLocationName: 'id' in target && partnerLocationId ? target.name : undefined,
+      isPremium: partner.isPremium,
+    });
     const win = window.open(url, '_blank', 'noopener,noreferrer');
     if (!win) {
       window.location.href = url;
@@ -125,6 +143,16 @@ export default function ParceirosPage() {
         <a
           href={`tel:${target.phone}`}
           onClick={() => {
+            trackPartnerClickEvent({
+              partnerId: partner.id,
+              partnerName: partner.name,
+              partnerCategory: partner.category,
+              action: 'phone',
+              placement: 'partners_page',
+              partnerLocationId: options.locationId,
+              partnerLocationName: options.locationId ? target.name : undefined,
+              isPremium: partner.isPremium,
+            });
             void trackPartnerClick(partner.id, 'partners_page_phone', options.locationId);
           }}
           style={{ flex: '1 1 92px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1.5px solid var(--gray-200)', background: 'var(--surface)', color: 'var(--ink)', borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}
@@ -135,7 +163,7 @@ export default function ParceirosPage() {
       )}
       {target.whatsapp && (
         <button
-          onClick={() => handlePartnerClick(partner, buildWhatsAppUrl(target.whatsapp as string, partner.name), 'partners_page_whatsapp', options.locationId)}
+          onClick={() => handlePartnerClick(partner, target, buildWhatsAppUrl(target.whatsapp as string, partner.name), 'whatsapp', 'partners_page_whatsapp', options.locationId)}
           style={{ flex: '1 1 112px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#25D366', color: '#062b14', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           WhatsApp
@@ -143,7 +171,7 @@ export default function ParceirosPage() {
       )}
       {options.showOffer && partner.websiteUrl && (
         <button
-          onClick={() => handlePartnerClick(partner, partner.websiteUrl as string, 'partners_page_offer')}
+          onClick={() => handlePartnerClick(partner, partner, partner.websiteUrl as string, 'offer', 'partners_page_offer')}
           style={{ flex: '1 1 112px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           Ver oferta
@@ -151,7 +179,7 @@ export default function ParceirosPage() {
       )}
       {target.wazeUrl && (
         <button
-          onClick={() => handlePartnerClick(partner, target.wazeUrl as string, 'partners_page_waze', options.locationId)}
+          onClick={() => handlePartnerClick(partner, target, target.wazeUrl as string, 'waze', 'partners_page_waze', options.locationId)}
           style={{ flex: '1 1 92px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#33CCFF', color: 'var(--ink)', border: 0, borderRadius: 12, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           Waze
@@ -173,7 +201,12 @@ export default function ParceirosPage() {
         {categories.map((cat) => (
           <button
             key={cat.value}
-            onClick={() => setSelectedCategory(cat.value)}
+            onClick={() => {
+              setSelectedCategory(cat.value);
+              trackEvent('partner_category_selected', {
+                partner_category: cat.value || 'all',
+              });
+            }}
             style={{
               flexShrink: 0, padding: '8px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700,
               border: '1px solid',
@@ -298,6 +331,7 @@ export default function ParceirosPage() {
           Sua oficina, posto ou seguro na frente de quem roda todo dia.
         </p>
         <a href="/anuncie"
+          onClick={() => trackCtaClick('partners_advertise', { placement: 'partners_bottom_cta' })}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--ink)', color: '#fff', borderRadius: 12, padding: '12px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
           Anuncie aqui →
         </a>

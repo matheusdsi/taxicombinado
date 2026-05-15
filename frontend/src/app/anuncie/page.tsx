@@ -8,6 +8,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { LoadingButton } from '@/components/ui/LoadingButton';
 import { SelectInput } from '@/components/ui/SelectInput';
 import { submitBecomePartner } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 const schema = z.object({
   companyName: z.string().min(2, 'Informe o nome da empresa'),
@@ -38,10 +39,26 @@ export default function AnunciePage() {
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
+    trackEvent('partner_application_submit_attempt', {
+      partner_category: data.category,
+      city: data.city,
+    });
     try {
       await submitBecomePartner(data);
+      trackEvent('generate_lead', {
+        lead_type: 'partner_application',
+        partner_category: data.category,
+        city: data.city,
+      });
+      trackEvent('partner_application_submitted', {
+        partner_category: data.category,
+        city: data.city,
+      });
       setSuccess(true);
     } catch {
+      trackEvent('partner_application_submit_error', {
+        partner_category: data.category,
+      });
       alert('Erro ao enviar. Tente novamente.');
     } finally {
       setLoading(false);

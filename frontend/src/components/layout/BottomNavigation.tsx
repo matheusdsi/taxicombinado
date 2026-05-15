@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { trackEvent } from '@/lib/analytics';
 
 const navItems = [
   {
@@ -48,6 +49,10 @@ export function BottomNavigation() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => trackEvent('bottom_nav_click', {
+                nav_label: item.label,
+                nav_href: item.href,
+              })}
               style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '6px 4px', borderRadius: 12 }}
             >
               <div style={{

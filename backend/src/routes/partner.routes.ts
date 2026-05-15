@@ -76,13 +76,41 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/click', async (req: Request, res: Response) => {
   try {
     const input = partnerClickSchema.parse(req.body);
+    const dedupeWindow = new Date(Date.now() - 10_000);
+    const normalizedSource = input.source?.trim() || null;
+
+    if (input.partnerLocationId) {
+      const location = await prisma.partnerLocation.findFirst({
+        where: { id: input.partnerLocationId, partnerId: input.partnerId, isActive: true },
+        select: { id: true },
+      });
+
+      if (!location) {
+        return res.status(400).json({ success: false, error: 'Unidade do parceiro invalida' });
+      }
+    }
+
+    const recentClick = await prisma.partnerClick.findFirst({
+      where: {
+        partnerId: input.partnerId,
+        partnerLocationId: input.partnerLocationId ?? null,
+        anonymousId: req.anonymousId ?? null,
+        source: normalizedSource,
+        createdAt: { gte: dedupeWindow },
+      },
+      select: { id: true },
+    });
+
+    if (recentClick) {
+      return res.json({ success: true, deduped: true });
+    }
 
     await prisma.partnerClick.create({
       data: {
         partnerId: input.partnerId,
         partnerLocationId: input.partnerLocationId,
         anonymousId: req.anonymousId,
-        source: input.source,
+        source: normalizedSource,
       },
     });
 

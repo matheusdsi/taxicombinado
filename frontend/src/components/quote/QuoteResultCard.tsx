@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { QuoteResult, RouteStep } from '@/lib/api';
 import { formatCurrencyBRL, formatDistance, generateWhatsAppText } from '@/lib/formatters';
 import { getMyGoal, MyGoalData } from '@/lib/myGoal';
+import { trackCtaClick, trackEvent } from '@/lib/analytics';
 
 interface QuoteResultCardProps {
   result: QuoteResult;
@@ -84,12 +85,24 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
     ].filter(Boolean).join('\n');
 
     navigator.clipboard.writeText(lines).then(() => {
+      trackEvent('quote_result_copied', {
+        quote_id: quoteId,
+        trip_type: result.tripType,
+        recommended_price: result.recommendedPrice,
+      });
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
   const shareWhatsApp = () => {
+    trackEvent('share', {
+      method: 'whatsapp',
+      content_type: 'quote',
+      item_id: quoteId,
+      recommended_price: result.recommendedPrice,
+      trip_type: result.tripType,
+    });
     const text = generateWhatsAppText({
       origin: originAddress,
       destination: destinationAddress,
@@ -389,6 +402,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
             <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 3 }}>Pneus, manutenção e combustível pesam para quem roda todo dia.</div>
           </div>
           <a href="/parceiros"
+            onClick={() => trackCtaClick('quote_result_partners', { placement: 'quote_result_card' })}
             style={{ background: 'var(--ink)', color: '#fff', border: 0, borderRadius: 12, padding: '10px 14px', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'none', flexShrink: 0 }}>
             Ver
           </a>
@@ -396,7 +410,10 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       </div>
 
       {/* ─── Nova cotação ─── */}
-      <button type="button" onClick={onNewQuote}
+      <button type="button" onClick={() => {
+        trackEvent('quote_recalculate_clicked', { quote_id: quoteId });
+        onNewQuote();
+      }}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--gray-100)', color: 'var(--gray-700)', border: 0, borderRadius: 14, padding: '14px 16px', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5M11 6l-6 6 6 6"/>

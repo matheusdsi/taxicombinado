@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { AddressInput } from '@/components/ui/AddressInput';
 import { api, calculateRoute } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 // ─── Tarifa base padrão para estimativa ──────────────────────────
 const FARE = { baseFare: 6.55, pricePerKm: 4.8 };
@@ -159,6 +160,14 @@ export default function AgendarPage() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
+    trackEvent('ride_request_submit_attempt', {
+      has_estimate: Boolean(estimate),
+      estimated_distance_km: estimate?.distanceKm,
+      passenger_count: form.passengerCount,
+      needs_large_vehicle: form.needsLargeVehicle,
+      needs_accessibility: form.needsAccessibility,
+      has_luggage: form.hasLuggage,
+    });
     try {
       const res = await api.post('/api/ride-requests', {
         ...form,
@@ -167,8 +176,20 @@ export default function AgendarPage() {
         estimatedDistanceKm: estimate?.distanceKm,
       });
       setWhatsappUrl(res.data.data.whatsappUrl);
+      trackEvent('generate_lead', {
+        lead_type: 'ride_request',
+        value: estimate?.max,
+        currency: 'BRL',
+        estimated_distance_km: estimate?.distanceKm,
+      });
+      trackEvent('ride_request_submitted', {
+        estimated_price_min: estimate?.min,
+        estimated_price_max: estimate?.max,
+        estimated_distance_km: estimate?.distanceKm,
+      });
       setDone(true);
     } catch {
+      trackEvent('ride_request_submit_error');
       alert('Erro ao enviar solicitação. Tente novamente.');
     } finally {
       setSubmitting(false);
@@ -190,6 +211,7 @@ export default function AgendarPage() {
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackEvent('ride_request_whatsapp_opened')}
             className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-2xl transition-colors text-sm shadow"
           >
             <span>💬</span>

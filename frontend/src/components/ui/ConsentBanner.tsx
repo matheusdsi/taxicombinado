@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { trackEvent } from '@/lib/analytics';
 
 const CONSENT_KEY = 'pct_cookie_consent';
 const CONSENT_VERSION = '1';
@@ -35,6 +36,22 @@ export function ConsentBanner() {
       version: CONSENT_VERSION,
       at: new Date().toISOString(),
     }));
+    const analyticsWindow = window as typeof window & {
+      gtag?: (...args: unknown[]) => void;
+      dataLayer?: Array<Record<string, unknown>>;
+    };
+    analyticsWindow.dataLayer = analyticsWindow.dataLayer || [];
+    analyticsWindow.dataLayer.push({
+      event: 'cookie_consent_update',
+      consent_choice: choice,
+    });
+    analyticsWindow.gtag?.('consent', 'update', {
+      analytics_storage: choice === 'accepted' ? 'granted' : 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+    });
+    trackEvent('cookie_consent_saved', { consent_choice: choice });
     setShow(false);
   };
 
@@ -60,6 +77,7 @@ export function ConsentBanner() {
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2, lineHeight: 1.4 }}>
               Usamos cookies essenciais para salvar seu histórico de cotações neste dispositivo, conforme a{' '}
               <Link href="/privacidade" style={{ color: '#FDE68A', textDecoration: 'underline' }}>LGPD</Link>.
+              Com sua permissão, também usamos analytics para melhorar o serviço.
             </div>
           </div>
         </div>
@@ -77,6 +95,7 @@ export function ConsentBanner() {
                 { name: 'pct_anonymous_id', desc: 'Identificador anônimo para seu histórico de cotações (365 dias)' },
                 { name: 'pct_cookie_consent', desc: 'Registro da sua escolha de consentimento' },
                 { name: 'pct_local_quotes', desc: 'Histórico de cotações salvo localmente (localStorage)' },
+                { name: 'Google Analytics', desc: 'Medição de uso ativada apenas se você aceitar analytics' },
               ].map((c) => (
                 <div key={c.name} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.12)', padding: '1px 5px', borderRadius: 4, fontSize: 10, flexShrink: 0, marginTop: 1 }}>{c.name}</span>
@@ -85,7 +104,7 @@ export function ConsentBanner() {
               ))}
             </div>
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
-              Nenhum cookie de rastreamento ou publicidade.{' '}
+              Não vendemos dados nem usamos publicidade direcionada dentro do app.{' '}
               <Link href="/cookies" style={{ color: '#FDE68A', textDecoration: 'underline' }}>Ver política completa de cookies</Link>.
             </div>
           </div>

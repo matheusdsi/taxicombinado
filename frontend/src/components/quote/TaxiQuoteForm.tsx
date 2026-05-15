@@ -9,6 +9,7 @@ import { NumberInput } from '@/components/ui/NumberInput';
 import { LoadingButton } from '@/components/ui/LoadingButton';
 import { AddressInput } from '@/components/ui/AddressInput';
 import { calculateQuote, calculateRoute, QuoteResult, RouteStep } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 const PRESETS = {
   comum: { baseFare: 6.55, pricePerKm: 4.8, waitingPrice: 55.5, waitingChargeType: 'per_hour' as const },
@@ -71,17 +72,6 @@ type FormValues = z.infer<typeof schema>;
 
 interface TaxiQuoteFormProps {
   onResult: (result: QuoteResult, quoteId: string, formValues: FormValues, steps: RouteStep[], stops: string[]) => void;
-}
-
-function pushAnalyticsEvent(event: string, params: Record<string, unknown> = {}) {
-  if (typeof window === 'undefined') return;
-
-  const analyticsWindow = window as typeof window & {
-    dataLayer?: Record<string, unknown>[];
-  };
-
-  analyticsWindow.dataLayer = analyticsWindow.dataLayer || [];
-  analyticsWindow.dataLayer.push({ event, ...params });
 }
 
 // ─── Segmented control ───────────────────────────────────────
@@ -197,7 +187,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       if (!name || formStartedRef.current) return;
 
       formStartedRef.current = true;
-      pushAnalyticsEvent('quote_form_started', {
+      trackEvent('quote_form_started', {
         first_field: name,
       });
     });
@@ -264,7 +254,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     const estimatedWaitingMinutes = data.tripType === 'round_trip' && data.hasWaiting
       ? Math.round(data.waitingHours * 60)
       : routeStoppedMinutes;
-    pushAnalyticsEvent('quote_calculate_attempt', {
+    trackEvent('quote_calculate_attempt', {
       trip_type: data.tripType,
       route_mode: data.routeMode,
       distance_km: data.distanceKm,
@@ -289,7 +279,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
         desiredMarginPercent: data.desiredMarginPercent ?? 0,
         customChargedPrice: data.customChargedPrice && data.customChargedPrice > 0 ? data.customChargedPrice : undefined,
       });
-      pushAnalyticsEvent('quote_calculated', {
+      trackEvent('quote_calculated', {
         quote_id: response.quoteId,
         trip_type: response.result.tripType,
         route_mode: data.routeMode,
@@ -302,7 +292,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       onResult(response.result, response.quoteId, data, routeInfo?.steps ?? [], points.slice(1, -1).filter((w) => w.trim()));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
-      pushAnalyticsEvent('quote_calculate_error', {
+      trackEvent('quote_calculate_error', {
         trip_type: data.tripType,
         route_mode: data.routeMode,
       });
