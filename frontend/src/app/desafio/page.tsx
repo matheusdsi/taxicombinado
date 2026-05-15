@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { calculateRoute, calculateQuote, getPopularRoutes } from '@/lib/api';
 import type { PopularRoute } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 interface Challenge {
   origin: string;
@@ -79,6 +80,9 @@ export default function DesafioPage() {
   const [popular, setPopular] = useState<PopularRoute[]>([]);
 
   useEffect(() => {
+    trackEvent('challenge_page_viewed', {
+      challenge_id: dayIndex + 1,
+    });
     try {
       const stored = localStorage.getItem('desafio_result');
       if (stored) {
@@ -103,6 +107,10 @@ export default function DesafioPage() {
     }
     setError('');
     setLoading(true);
+    trackEvent('challenge_calculate_attempt', {
+      challenge_id: dayIndex + 1,
+      guessed_price: guessValue,
+    });
     try {
       const routeInfo = await calculateRoute(challenge.origin, challenge.destination);
       if (!routeInfo.distanceKm || !routeInfo.durationMinutes) {
@@ -124,7 +132,17 @@ export default function DesafioPage() {
       };
       setResult(data);
       localStorage.setItem('desafio_result', JSON.stringify(data));
+      trackEvent('challenge_completed', {
+        challenge_id: dayIndex + 1,
+        guessed_price: guessValue,
+        recommended_price: data.recommendedPrice,
+        distance_km: data.distanceKm,
+        difference_percent: Number((((guessValue - data.recommendedPrice) / data.recommendedPrice) * 100).toFixed(2)),
+      });
     } catch {
+      trackEvent('challenge_calculate_error', {
+        challenge_id: dayIndex + 1,
+      });
       setError('Erro ao calcular a rota. Tente novamente.');
     } finally {
       setLoading(false);
@@ -309,6 +327,11 @@ export default function DesafioPage() {
               href={`https://wa.me/?text=${encodeURIComponent(shareMsg)}`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackEvent('share', {
+                method: 'whatsapp',
+                content_type: 'challenge',
+                item_id: String(dayIndex + 1),
+              })}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 background: '#25D366', color: '#fff', borderRadius: 12,
@@ -325,6 +348,9 @@ export default function DesafioPage() {
 
           <button
             onClick={() => {
+              trackEvent('challenge_retry_clicked', {
+                challenge_id: dayIndex + 1,
+              });
               setResult(null);
               setGuess('');
               localStorage.removeItem('desafio_result');

@@ -199,7 +199,12 @@ export default function MinhaMetaPage() {
             Cadastre seus custos principais e veja sua meta mínima mensal, diária, por hora e por km.
           </p>
           {!showResult && (
-            <a href="#goal-form" className="tc-btn-primary" style={{ display: 'inline-flex', textDecoration: 'none', marginTop: 16, boxShadow: 'none', background: 'var(--ink)', color: '#fff' }}>
+            <a
+              href="#goal-form"
+              onClick={() => trackGoalEvent('goal_hero_cta_clicked')}
+              className="tc-btn-primary"
+              style={{ display: 'inline-flex', textDecoration: 'none', marginTop: 16, boxShadow: 'none', background: 'var(--ink)', color: '#fff' }}
+            >
               Calcular minha meta
             </a>
           )}
@@ -304,7 +309,14 @@ export default function MinhaMetaPage() {
             required
           />
 
-          <button type="submit" className="tc-btn-primary">
+          <button
+            type="submit"
+            onClick={() => trackGoalEvent('goal_submit_clicked', {
+              has_result: showResult,
+              car_cost_type: form.tipo_custo_carro,
+            })}
+            className="tc-btn-primary"
+          >
             Ver minha meta
           </button>
         </form>
@@ -371,7 +383,10 @@ export default function MinhaMetaPage() {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => setAccountCtaDismissed(true)}
+                    onClick={() => {
+                      trackGoalEvent('goal_account_cta_dismissed');
+                      setAccountCtaDismissed(true);
+                    }}
                     style={{ border: 0, background: 'transparent', color: 'var(--gray-700)', borderRadius: 12, padding: '11px 10px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}
                   >
                     Continuar sem conta

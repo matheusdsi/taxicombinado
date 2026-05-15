@@ -1,6 +1,7 @@
 'use client';
 
 import { getOrCreateAnonymousId } from './anonymousId';
+import { AnalyticsParams, trackEvent } from './analytics';
 
 export type CarCostType = 'prestacao' | 'diaria' | 'nenhum';
 
@@ -162,11 +163,6 @@ export function hasMyGoal(): boolean {
   return Boolean(goal && goal.meta_minima_mensal > 0 && goal.meta_diaria > 0);
 }
 
-export function trackGoalEvent(event: string, params: Record<string, unknown> = {}) {
-  if (typeof window === 'undefined') return;
-  const analyticsWindow = window as typeof window & {
-    dataLayer?: Array<Record<string, unknown>>;
-  };
-  analyticsWindow.dataLayer = analyticsWindow.dataLayer || [];
-  analyticsWindow.dataLayer.push({ event, ...params });
+export function trackGoalEvent(event: string, params: AnalyticsParams = {}) {
+  trackEvent(event, params);
 }
