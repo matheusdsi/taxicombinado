@@ -60,6 +60,7 @@ export interface CalculateQuotePayload {
   desiredMarginPercent: number;
   driverMinimumValue: number;
   customChargedPrice?: number;
+  source?: string;
 }
 
 export interface Alert {

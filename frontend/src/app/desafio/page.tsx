@@ -122,6 +122,7 @@ export default function DesafioPage() {
         destinationAddress: challenge.destination,
         distanceKm: routeInfo.distanceKm,
         estimatedMinutes: routeInfo.durationMinutes,
+        source: 'challenge',
       });
       const data: ChallengeResult = {
         recommendedPrice: quoteResult.result.recommendedPrice,

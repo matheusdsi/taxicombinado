@@ -72,12 +72,16 @@ router.get('/stats', async (_req: Request, res: Response) => {
     const last7 = new Date(today.getTime() - 7 * 86400000);
     const last30 = new Date(today.getTime() - 30 * 86400000);
 
+    const nonChallengeWhere = { OR: [{ source: null }, { source: { not: 'challenge' } }] };
+
     const [
       totalQuotes,
       quotesToday,
       quotesYesterday,
       quotesLast7,
       quotesLast30,
+      challengesTotal,
+      challengesToday,
       totalSessions,
       sessionsToday,
       totalPartners,
@@ -88,11 +92,13 @@ router.get('/stats', async (_req: Request, res: Response) => {
       totalFeedback,
       avgRating,
     ] = await Promise.all([
-      prisma.quote.count(),
-      prisma.quote.count({ where: { createdAt: { gte: today } } }),
-      prisma.quote.count({ where: { createdAt: { gte: yesterday, lt: today } } }),
-      prisma.quote.count({ where: { createdAt: { gte: last7 } } }),
-      prisma.quote.count({ where: { createdAt: { gte: last30 } } }),
+      prisma.quote.count({ where: nonChallengeWhere }),
+      prisma.quote.count({ where: { ...nonChallengeWhere, createdAt: { gte: today } } }),
+      prisma.quote.count({ where: { ...nonChallengeWhere, createdAt: { gte: yesterday, lt: today } } }),
+      prisma.quote.count({ where: { ...nonChallengeWhere, createdAt: { gte: last7 } } }),
+      prisma.quote.count({ where: { ...nonChallengeWhere, createdAt: { gte: last30 } } }),
+      prisma.quote.count({ where: { source: 'challenge' } }),
+      prisma.quote.count({ where: { source: 'challenge', createdAt: { gte: today } } }),
       prisma.anonymousSession.count(),
       prisma.anonymousSession.count({ where: { createdAt: { gte: today } } }),
       prisma.partner.count({ where: { isActive: true } }),
@@ -241,8 +247,9 @@ router.get('/stats', async (_req: Request, res: Response) => {
       include: { partner: { select: { name: true, category: true } } },
     });
 
-    // Recent quotes
+    // Recent quotes (exclude challenge quotes)
     const recentQuotes = await prisma.quote.findMany({
+      where: nonChallengeWhere,
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: {
@@ -310,6 +317,8 @@ router.get('/stats', async (_req: Request, res: Response) => {
           quotesYesterday,
           quotesLast7,
           quotesLast30,
+          challengesTotal,
+          challengesToday,
           totalSessions,
           sessionsToday,
           totalPartners,
@@ -366,6 +375,56 @@ router.get('/stats', async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('Admin stats error:', error);
     return res.status(500).json({ success: false, error: 'Erro ao buscar estatísticas' });
+  }
+});
+
+// ─── GET /api/admin/quotes ────────────────────────────────────
+router.get('/quotes', async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10));
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '20'), 10)));
+    const filter = String(req.query.filter ?? 'all');
+
+    const nonChallenge = { OR: [{ source: null }, { source: { not: 'challenge' } }] };
+    const where: Record<string, unknown> = { ...nonChallenge };
+    if (filter === 'today') {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      where.createdAt = { gte: startOfDay, lt: endOfDay };
+    }
+
+    const [total, quotes] = await Promise.all([
+      prisma.quote.count({ where }),
+      prisma.quote.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          createdAt: true,
+          originAddress: true,
+          destinationAddress: true,
+          tripType: true,
+          distanceKm: true,
+          recommendedPrice: true,
+          totalCost: true,
+          profit: true,
+          margin: true,
+          fuelType: true,
+          routeMode: true,
+        },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: { quotes, total, page, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    console.error('Admin quotes error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar cotações' });
   }
 });
 

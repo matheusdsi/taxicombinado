@@ -86,6 +86,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
           profit: result.profit,
           margin: result.margin,
           alerts: result.alerts as object[],
+          source: input.source ?? null,
           stops: input.stops?.length
             ? { create: input.stops.map((address, index) => ({ order: index, address })) }
             : undefined,

@@ -230,6 +230,7 @@ model Quote {
   profit                Float    @map("profit")
   margin                Float    @map("margin")
   alerts                Json     @default("[]")
+  source                String?  @map("source")
 
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")

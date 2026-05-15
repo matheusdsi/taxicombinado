@@ -40,6 +40,9 @@ export const calculateQuoteSchema = z.object({
   desiredMarginPercent: z.number().min(0).max(99).default(0),
   driverMinimumValue: z.number().min(0).default(0),
   customChargedPrice: z.number().positive().optional(),
+
+  // Source tracking
+  source: z.string().optional(),
 });
 
 export type CalculateQuoteInput = z.infer<typeof calculateQuoteSchema>;

@@ -12,6 +12,8 @@ interface AdminStats {
     quotesYesterday: number;
     quotesLast7: number;
     quotesLast30: number;
+    challengesTotal: number;
+    challengesToday: number;
     totalSessions: number;
     sessionsToday: number;
     totalPartners: number;
@@ -355,6 +357,9 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabId>('master');
   const [adminSelectedQuote, setAdminSelectedQuote] = useState<AdminStats['recentActivity']['quotes'][0] | null>(null);
   const [quotesTablePage, setQuotesTablePage] = useState(1);
+  const [quotesFilter, setQuotesFilter] = useState<'all' | 'today'>('all');
+  const [quotesData, setQuotesData] = useState<{ quotes: AdminStats['recentActivity']['quotes']; total: number; totalPages: number } | null>(null);
+  const [quotesLoading, setQuotesLoading] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     const res = await fetch(apiUrl('/api/admin/settings'), { credentials: 'include' });
@@ -395,6 +400,20 @@ export default function AdminPage() {
     }
   }, [fetchAdminPartners, fetchSettings]);
 
+  const fetchQuotes = useCallback(async (page: number, filter: 'all' | 'today') => {
+    setQuotesLoading(true);
+    try {
+      const res = await fetch(apiUrl(`/api/admin/quotes?page=${page}&limit=20&filter=${filter}`), { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao carregar cotações');
+      setQuotesData(json.data);
+    } catch {
+      // silently fail, table shows last data
+    } finally {
+      setQuotesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -421,6 +440,10 @@ export default function AdminPage() {
     const id = window.setInterval(fetchStats, 60000);
     return () => window.clearInterval(id);
   }, [stats, fetchStats]);
+
+  useEffect(() => {
+    fetchQuotes(quotesTablePage, quotesFilter);
+  }, [quotesTablePage, quotesFilter, fetchQuotes]);
 
   async function handleLogout() {
     await fetch(apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
@@ -596,10 +619,8 @@ export default function AdminPage() {
   const maxDailyQuotes = Math.max(1, ...timeSeries.quotesPerDay.map((item) => item.count));
   const alertTotal = breakdowns.alertsFrequency.reduce((sum, item) => sum + item.count, 0);
   const recentPriceRows = [...timeSeries.avgPricePerDay].reverse().slice(0, 10);
-  const QUOTES_PER_PAGE = 10;
-  const allQuoteRows = recentActivity.quotes;
-  const quotesPageTotal = Math.ceil(allQuoteRows.length / QUOTES_PER_PAGE);
-  const recentQuoteRows = allQuoteRows.slice((quotesTablePage - 1) * QUOTES_PER_PAGE, quotesTablePage * QUOTES_PER_PAGE);
+  const quotesRows = quotesData?.quotes ?? recentActivity.quotes.slice(0, 20);
+  const quotesPageTotal = quotesData?.totalPages ?? 1;
 
   return (
     <main className="min-h-screen bg-[#f4f3ef] text-zinc-950">
@@ -691,6 +712,7 @@ export default function AdminPage() {
                       <MetricCard label="30 dias" value={overview.quotesLast30} tone="blue" />
                       <MetricCard label="Leads hoje" value={overview.leadsToday} tone="green" />
                       <MetricCard label="Cliques hoje" value={overview.partnerClicksToday} tone="green" />
+                      <MetricCard label="Desafios hoje" value={overview.challengesToday} detail={`${overview.challengesTotal} total`} tone="yellow" />
                     </div>
                   </div>
                 </Card>
@@ -698,14 +720,34 @@ export default function AdminPage() {
 
               <div className="grid gap-5 xl:grid-cols-3">
                 <Card className="p-5 xl:col-span-2">
-                  <SectionHeader title="Ultimas cotacoes" eyebrow="Operacao" />
-                  <QuotesTable
-                    rows={recentQuoteRows}
-                    onSelect={setAdminSelectedQuote}
-                    page={quotesTablePage}
-                    totalPages={quotesPageTotal}
-                    onPageChange={setQuotesTablePage}
-                  />
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <SectionHeader title="Cotacoes" eyebrow="Operacao" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setQuotesFilter('today'); setQuotesTablePage(1); }}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${quotesFilter === 'today' ? 'bg-zinc-950 text-white' : 'border border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}
+                      >
+                        Hoje {quotesFilter === 'today' && quotesData ? `(${quotesData.total})` : `(${overview.quotesToday})`}
+                      </button>
+                      <button
+                        onClick={() => { setQuotesFilter('all'); setQuotesTablePage(1); }}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${quotesFilter === 'all' ? 'bg-zinc-950 text-white' : 'border border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}
+                      >
+                        Todas {quotesFilter === 'all' && quotesData ? `(${quotesData.total})` : `(${overview.totalQuotes})`}
+                      </button>
+                    </div>
+                  </div>
+                  {quotesLoading ? (
+                    <p className="py-6 text-center text-sm font-bold text-zinc-400">Carregando...</p>
+                  ) : (
+                    <QuotesTable
+                      rows={quotesRows}
+                      onSelect={setAdminSelectedQuote}
+                      page={quotesTablePage}
+                      totalPages={quotesPageTotal}
+                      onPageChange={(p) => setQuotesTablePage(p)}
+                    />
+                  )}
                 </Card>
                 <Card className="p-5">
                   <SectionHeader title="Alertas frequentes" eyebrow="Risco" />
