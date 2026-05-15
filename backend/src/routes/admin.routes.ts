@@ -629,6 +629,72 @@ router.patch('/partner-locations/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/admin/users ─────────────────────────────────────
+router.get('/users', async (_req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { role: 'driver' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        createdAt: true,
+        _count: { select: { quotes: true } },
+        quotes: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
+      },
+    });
+
+    const result = users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      role: u.role,
+      createdAt: u.createdAt,
+      totalQuotes: u._count.quotes,
+      lastQuoteAt: u.quotes[0]?.createdAt ?? null,
+    }));
+
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('Admin users error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar usuários' });
+  }
+});
+
+// ─── POST /api/admin/users/:id/reset-password ─────────────────
+router.post('/users/:id/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body as { password?: string };
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Senha deve ter ao menos 6 caracteres' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user || user.role !== 'driver') {
+      return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+    }
+
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({ where: { id }, data: { passwordHash } });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao redefinir senha' });
+  }
+});
+
 function round2(n: number | null | undefined): number | null {
   if (n == null) return null;
   return Math.round(n * 100) / 100;
