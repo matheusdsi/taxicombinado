@@ -260,11 +260,13 @@ router.get('/stats', async (_req: Request, res: Response) => {
         tripType: true,
         distanceKm: true,
         recommendedPrice: true,
+        farePrice: true,
         totalCost: true,
         profit: true,
         margin: true,
         fuelType: true,
         routeMode: true,
+        desiredMarginPercent: true,
       },
     });
 
@@ -409,11 +411,13 @@ router.get('/quotes', async (req: Request, res: Response) => {
           tripType: true,
           distanceKm: true,
           recommendedPrice: true,
+          farePrice: true,
           totalCost: true,
           profit: true,
           margin: true,
           fuelType: true,
           routeMode: true,
+          desiredMarginPercent: true,
         },
       }),
     ]);

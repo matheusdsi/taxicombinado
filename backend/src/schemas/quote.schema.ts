@@ -13,6 +13,7 @@ export const calculateQuoteSchema = z.object({
   returnDistanceKm: z.number().positive().optional(),
   totalDistanceKm: z.number().positive().optional(),
   estimatedMinutes: z.number().min(0).default(0),
+  trafficExtraMinutes: z.number().min(0).default(0),
 
   // Stops
   stops: z.array(z.string()).optional(),

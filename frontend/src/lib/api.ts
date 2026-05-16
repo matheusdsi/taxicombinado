@@ -43,6 +43,7 @@ export interface CalculateQuotePayload {
   returnDistanceKm?: number;
   totalDistanceKm?: number;
   estimatedMinutes: number;
+  trafficExtraMinutes?: number;
   stops?: string[];
   consumptionKmPerLiter: number;
   fuelPricePerLiter: number;
@@ -81,7 +82,11 @@ export interface QuoteResult {
   parkingCost: number;
   extraCosts: number;
   totalCost: number;
+  baseKmPrice: number;
   timeCharge: number;
+  trafficAddition: number;
+  trafficCapped: boolean;
+  trafficExtraMinutes: number;
   farePrice: number;
   minimumPrice: number;
   priceWithMargin: number;
@@ -119,6 +124,7 @@ export interface RouteStep {
 export async function calculateRoute(origin: string, destination: string, waypoints?: string[]): Promise<{
   distanceKm: number | null;
   durationMinutes: number | null;
+  baseDurationMinutes: number | null;
   provider: string;
   steps: RouteStep[];
 }> {

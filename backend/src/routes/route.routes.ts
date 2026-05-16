@@ -29,6 +29,7 @@ router.post('/calculate', async (req: Request, res: Response) => {
         data: {
           distanceKm: result.distanceKm,
           durationMinutes: result.durationMinutes,
+          baseDurationMinutes: result.baseDurationMinutes ?? null,
           polyline: result.polyline,
           provider: result.provider,
           steps: showRouteSteps ? (result.steps ?? []) : [],

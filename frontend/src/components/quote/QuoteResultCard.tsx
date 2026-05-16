@@ -29,11 +29,12 @@ function splitMoney(n: number) {
   return { int, dec };
 }
 
-function CostRow({ label, value, bold = false }: { label: string; value: number; bold?: boolean }) {
+function CostRow({ label, value, bold = false, tone }: { label: string; value: number; bold?: boolean; tone?: 'green' | 'red' }) {
+  const color = tone === 'green' ? 'var(--green)' : tone === 'red' ? 'var(--red)' : bold ? 'var(--ink)' : 'var(--gray-700)';
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 14 }}>
       <span style={{ color: bold ? 'var(--ink)' : 'var(--gray-700)', fontWeight: bold ? 800 : 600 }}>{label}</span>
-      <span style={{ fontWeight: bold ? 800 : 700, color: bold ? 'var(--ink)' : 'var(--gray-700)' }}>{formatCurrencyBRL(value)}</span>
+      <span style={{ fontWeight: bold ? 800 : 700, color }}>{formatCurrencyBRL(value)}</span>
     </div>
   );
 }
@@ -48,9 +49,30 @@ function MoneyLine({ label, value, tone }: { label: string; value: number; tone?
   );
 }
 
+function BreakdownRow({ step, label, value, sub, highlight }: { step: number; label: string; value: string; sub?: string; highlight?: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+      padding: '10px 12px',
+      background: highlight ? 'var(--yellow-soft)' : step % 2 === 0 ? 'var(--gray-50)' : 'transparent',
+      borderRadius: 10, gap: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray-400)', minWidth: 18, paddingTop: 1 }}>{step}.</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{label}</div>
+          {sub && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginTop: 2 }}>{sub}</div>}
+        </div>
+      </div>
+      <span style={{ fontSize: 14, fontWeight: 900, color: highlight ? 'var(--ink)' : 'var(--gray-700)', flexShrink: 0 }}>{value}</span>
+    </div>
+  );
+}
+
 export function QuoteResultCard({ result, quoteId, originAddress, destinationAddress, stops = [], routeSteps = [], onNewQuote }: QuoteResultCardProps) {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(true);
   const [showSteps, setShowSteps] = useState(false);
   const [goal, setGoal] = useState<MyGoalData | null>(null);
 
@@ -58,8 +80,8 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
     setGoal(getMyGoal());
   }, []);
 
-  const profitRecommended = result.profit;
-  const lucroPositivo = profitRecommended > 0;
+  const sobraEstimada = result.profit;
+  const sobraPositiva = sobraEstimada > 0;
   const rec = splitMoney(result.recommendedPrice);
   const gainOverTaximeter = Math.max(0, result.recommendedPrice - result.farePrice);
   const tripPricePerKm = result.recommendedPrice / Math.max(1, result.totalDistanceKm || result.distanceKm);
@@ -79,7 +101,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       '',
       `💰 Preço estimado: ${formatCurrencyBRL(result.recommendedPrice)}`,
       `📊 Custo da corrida: ${formatCurrencyBRL(result.totalCost)}`,
-      `✅ Lucro estimado: ${formatCurrencyBRL(profitRecommended)}`,
+      `✅ Sobra estimada: ${formatCurrencyBRL(sobraEstimada)}`,
       '',
       'Calculado com Taxi Combinado',
     ].filter(Boolean).join('\n');
@@ -114,6 +136,13 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
+  // Breakdown items for "Como chegamos nesse valor"
+  const baseKmPrice = result.baseKmPrice;
+  const hasTraffic = result.trafficAddition > 0;
+  const hasManualWait = result.timeCharge > 0;
+
+  let breakdownStep = 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
@@ -134,20 +163,20 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(17,24,39,.7)' }}>Preço estimado</span>
           <span style={{ background: 'rgba(17,24,39,.1)', color: 'var(--ink)', padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>
-            Lucro {Math.round(result.margin)}%
+            Sobra {Math.round(result.margin)}%
           </span>
         </div>
         <div className="tc-money-xl">
           R$ {rec.int}<span className="cents">,{rec.dec}</span>
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(17,24,39,.65)', marginTop: 6 }}>
-          Com base no taxímetro estimado, incluindo tempo parado em trânsito, no ganho escolhido e nos custos informados.
+          Estimativa baseada na bandeirada, quilometragem, bandeira selecionada e ajuste moderado de trânsito quando disponível.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
           {[
             { lab: 'CUSTO',  val: formatCurrencyBRL(result.totalCost),    color: undefined },
-            { lab: 'LUCRO',  val: formatCurrencyBRL(profitRecommended),   color: lucroPositivo ? '#0F5132' : '#7F1D1D' },
+            { lab: 'SOBRA',  val: formatCurrencyBRL(sobraEstimada),   color: sobraPositiva ? '#0F5132' : '#7F1D1D' },
             { lab: 'POR KM', val: formatCurrencyBRL(result.recommendedPrice / Math.max(1, result.totalDistanceKm)), color: undefined },
           ].map((it) => (
             <div key={it.lab} style={{ background: 'rgba(17,24,39,.09)', padding: '10px 8px', borderRadius: 12 }}>
@@ -158,12 +187,105 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
         </div>
       </div>
 
+      {/* ─── Resumo no bolso ─── */}
       <div className="tc-card">
         <div className="tc-section-title">Resumo no bolso</div>
-        <MoneyLine label="Taximetro da corrida" value={result.farePrice} />
+        <MoneyLine label="Taxímetro estimado" value={result.farePrice} />
         {gainOverTaximeter > 0 && <MoneyLine label="Ganho colocado em cima" value={gainOverTaximeter} />}
         <MoneyLine label="Gasto para fazer a corrida" value={result.totalCost} />
-        <MoneyLine label="Sobra estimada para você" value={profitRecommended} tone={profitRecommended >= 0 ? 'green' : 'red'} />
+        <MoneyLine label="Sobra estimada para você" value={sobraEstimada} tone={sobraEstimada >= 0 ? 'green' : 'red'} />
+      </div>
+
+      {/* ─── Como chegamos nesse valor ─── */}
+      <div className="tc-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <button type="button" onClick={() => setShowBreakdown(!showBreakdown)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: 0, background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' as const }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Como chegamos nesse valor</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transform: showBreakdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--gray-400)', flexShrink: 0 }}>
+            <path d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        {showBreakdown && (
+          <div style={{ padding: '0 12px 14px', borderTop: '1px solid var(--gray-100)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ paddingTop: 10 }}>
+              {/* Step 1: Taxímetro base (bandeirada + km) */}
+              {(() => { breakdownStep = 1; return null; })()}
+              <BreakdownRow
+                step={breakdownStep}
+                label={`Taxímetro base — ${result.distanceKm.toFixed(1)} km`}
+                value={formatCurrencyBRL(baseKmPrice)}
+                sub="Bandeirada + km rodado (sem trânsito)"
+              />
+
+              {/* Step 2: Trânsito */}
+              {(() => { breakdownStep = breakdownStep + 1; return null; })()}
+              {hasTraffic ? (
+                <BreakdownRow
+                  step={breakdownStep}
+                  label="Adicional de trânsito"
+                  value={`+ ${formatCurrencyBRL(result.trafficAddition)}`}
+                  sub={`Calculado apenas sobre o tempo extra de trânsito (${result.trafficExtraMinutes ?? 0} min)`}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray-400)' }}>{breakdownStep}.</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-500)' }}>Sem adicional de trânsito aplicado.</span>
+                </div>
+              )}
+
+              {/* Step 3: Espera manual (se houver) */}
+              {hasManualWait && (() => { breakdownStep = breakdownStep + 1; return null; })()}
+              {hasManualWait && (
+                <BreakdownRow
+                  step={breakdownStep}
+                  label="Espera combinada"
+                  value={`+ ${formatCurrencyBRL(result.timeCharge)}`}
+                  sub="Tempo de espera informado pelo taxista"
+                />
+              )}
+
+              {/* Step: Pedágio */}
+              {result.tollTotal > 0 && (() => { breakdownStep = breakdownStep + 1; return null; })()}
+              {result.tollTotal > 0 && (
+                <BreakdownRow
+                  step={breakdownStep}
+                  label="Pedágio"
+                  value={`+ ${formatCurrencyBRL(result.tollTotal)}`}
+                />
+              )}
+
+              {/* Step: Extras manuais (extraCosts) */}
+              {result.extraCosts > 0 && (() => { breakdownStep = breakdownStep + 1; return null; })()}
+              {result.extraCosts > 0 && (
+                <BreakdownRow
+                  step={breakdownStep}
+                  label="Outros extras"
+                  value={`+ ${formatCurrencyBRL(result.extraCosts)}`}
+                  sub="Custos extras informados manualmente"
+                />
+              )}
+
+              {/* Final: Preço estimado */}
+              {(() => { breakdownStep = breakdownStep + 1; return null; })()}
+              <BreakdownRow
+                step={breakdownStep}
+                label="Preço estimado"
+                value={formatCurrencyBRL(result.recommendedPrice)}
+                highlight
+              />
+
+              {/* Ganho adicional se houver */}
+              {gainOverTaximeter > 0 && (
+                <div style={{ marginTop: 4, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>
+                    Incluindo ganho adicional de {formatCurrencyBRL(gainOverTaximeter)} sobre o taxímetro.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Impacto na meta ─── */}
@@ -186,7 +308,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
               Essa corrida sozinha já cobre sua meta diária.
             </div>
           )}
-          {profitRecommended > 0 && result.recommendedPrice < goal.meta_diaria && (
+          {sobraEstimada > 0 && result.recommendedPrice < goal.meta_diaria && (
             <div style={{ background: 'var(--yellow-soft)', color: 'var(--ink)', borderRadius: 12, padding: 11, fontSize: 13, fontWeight: 800, marginTop: 10 }}>
               Essa corrida ajuda em {dailyGoalPercent.toFixed(0)}% da sua meta do dia.
             </div>
@@ -266,8 +388,8 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
                         <span style={{ width: 1.5, flex: 1, minHeight: 20, background: 'var(--gray-200)', margin: '4px 0', display: 'block' }} />
                       )}
                     </div>
-                    <div style={{ flex: 1, paddingBottom: i < allPoints.length - 1 ? 10 : 0, paddingTop: 2 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700 }}>{pt.address}</div>
+                    <div style={{ flex: 1, paddingBottom: i < allPoints.length - 1 ? 10 : 0, paddingTop: 2, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pt.address}</div>
                       <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 2 }}>{pt.sublabel}</div>
                     </div>
                   </div>
@@ -326,7 +448,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: 0, background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' as const }}>
           <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Para onde vai o dinheiro</span>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
-            style={{ transform: showDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--gray-400)' }}>
+            style={{ transform: showDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'var(--gray-400)', flexShrink: 0 }}>
             <path d="M19 9l-7 7-7-7"/>
           </svg>
         </button>
@@ -338,9 +460,11 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
               {result.tollTotal > 0    && <CostRow label="Pedágio"         value={result.tollTotal} />}
               {result.parkingCost > 0  && <CostRow label="Estacionamento"   value={result.parkingCost} />}
               {result.extraCosts > 0   && <CostRow label="Outros gastos"     value={result.extraCosts} />}
-              {result.timeCharge > 0   && <CostRow label="Tempo no taxímetro (trânsito/espera)" value={result.timeCharge} />}
+              {result.timeCharge > 0   && <CostRow label="Espera combinada" value={result.timeCharge} />}
               <div style={{ height: 1, background: 'var(--gray-200)', margin: '8px 0' }}/>
               <CostRow label="Total que sai do seu bolso" value={result.totalCost} bold />
+              <div style={{ height: 1, background: 'var(--gray-200)', margin: '8px 0' }}/>
+              <CostRow label="Sobra estimada para você" value={sobraEstimada} bold tone={sobraEstimada >= 0 ? 'green' : 'red'} />
             </div>
           </div>
         )}
@@ -396,7 +520,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
             <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600, color: result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--gray-500)' }}>
               {result.customChargedPrice < result.minimumPrice
                 ? 'Abaixo do mínimo — pode dar prejuízo'
-                : `Lucro: ${formatCurrencyBRL(result.profit)}`}
+                : `Sobra estimada: ${formatCurrencyBRL(result.profit)}`}
             </div>
           </div>
           <div style={{ fontWeight: 800, fontSize: 22, color: result.customChargedPrice < result.minimumPrice ? 'var(--red)' : 'var(--ink)' }}>

@@ -130,8 +130,9 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<'comum' | 'luxo'>('comum');
+  const [activeBandeira, setActiveBandeira] = useState<1.0 | 1.3>(1.0);
   const [routeLoading, setRouteLoading] = useState(false);
-  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMinutes: number; provider: string; steps: RouteStep[] } | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMinutes: number; baseDurationMinutes: number | null; provider: string; steps: RouteStep[] } | null>(null);
   const [routeManualFallback, setRouteManualFallback] = useState(false);
   const [points, setPoints] = useState<string[]>(['', '']);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,12 +213,13 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     (preset: 'comum' | 'luxo') => {
       const p = PRESETS[preset];
       setValue('baseFare', p.baseFare, { shouldValidate: true });
-      setValue('pricePerKm', p.pricePerKm, { shouldValidate: true });
+      const kmRate = activeBandeira === 1.3 ? Number((p.pricePerKm * 1.3).toFixed(4)) : p.pricePerKm;
+      setValue('pricePerKm', kmRate, { shouldValidate: true });
       setValue('waitingPrice', Number(p.waitingPrice.toFixed(4)), { shouldValidate: true });
       setValue('waitingChargeType', p.waitingChargeType);
       setActivePreset(preset);
     },
-    [setValue]
+    [setValue, activeBandeira]
   );
 
   const fetchRoute = useCallback((origin: string, destination: string, wps: string[] = []) => {
@@ -231,7 +233,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       try {
         const result = await calculateRoute(origin, destination, filledWaypoints.length ? filledWaypoints : undefined);
         if (result.distanceKm !== null && result.durationMinutes !== null) {
-          setRouteInfo({ distanceKm: result.distanceKm, durationMinutes: result.durationMinutes, provider: result.provider, steps: result.steps ?? [] });
+          setRouteInfo({ distanceKm: result.distanceKm, durationMinutes: result.durationMinutes, baseDurationMinutes: result.baseDurationMinutes ?? null, provider: result.provider, steps: result.steps ?? [] });
           setValue('distanceKm', result.distanceKm, { shouldValidate: true });
           setValue('returnDistanceKm', result.distanceKm, { shouldValidate: true });
           setValue('routeMode', 'automatic');
@@ -250,10 +252,14 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
     setApiError(null);
-    const routeStoppedMinutes = Math.round((routeInfo?.durationMinutes ?? 0) * 0.40);
+    // Manual waiting: only when user explicitly marks round_trip waiting
     const estimatedWaitingMinutes = data.tripType === 'round_trip' && data.hasWaiting
       ? Math.round(data.waitingHours * 60)
-      : routeStoppedMinutes;
+      : 0;
+    // Traffic extra: difference between Google's duration_in_traffic and base duration
+    const trafficExtraMinutes = routeInfo?.baseDurationMinutes != null
+      ? Math.max(0, Math.round(routeInfo.durationMinutes - routeInfo.baseDurationMinutes))
+      : 0;
     trackEvent('quote_calculate_attempt', {
       trip_type: data.tripType,
       route_mode: data.routeMode,
@@ -268,6 +274,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
       const response = await calculateQuote({
         ...data,
         estimatedMinutes: estimatedWaitingMinutes,
+        trafficExtraMinutes,
         vehicleExtraCostPerKm: 0,
         driverMinimumValue: 0,
         totalDistanceKm: undefined,
@@ -554,14 +561,16 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', marginBottom: 8 }}>Bandeira:</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {([
-              { value: 1.0, label: 'Bandeira 1', sub: 'Dias úteis · 6h–20h' },
-              { value: 1.3, label: 'Bandeira 2', sub: 'Noite · dom. e feriados' },
-            ] as const).map((opt) => {
-              const isActive = flagMultiplier === opt.value;
+              { value: 1.0 as const, label: 'Bandeira 1', sub: 'Dias úteis · 6h–20h' },
+              { value: 1.3 as const, label: 'Bandeira 2', sub: 'Noite · dom. e feriados' },
+            ]).map((opt) => {
+              const isActive = activeBandeira === opt.value;
               return (
                 <button key={opt.value} type="button"
                   onClick={() => {
-                    setValue('flagMultiplier', opt.value);
+                    // flagMultiplier stays 1.0 — pricePerKm already encodes the bandeira rate
+                    setValue('flagMultiplier', 1.0);
+                    setActiveBandeira(opt.value);
                     const p = PRESETS[activePreset];
                     const kmRate = opt.value === 1.3 ? Number((p.pricePerKm * 1.3).toFixed(4)) : p.pricePerKm;
                     setValue('pricePerKm', kmRate, { shouldValidate: true });

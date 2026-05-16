@@ -46,8 +46,9 @@ interface AdminStats {
   recentActivity: {
     quotes: {
       id: string; createdAt: string; originAddress?: string; destinationAddress?: string;
-      tripType: string; distanceKm: number; recommendedPrice: number; totalCost: number;
-      profit: number; margin: number; fuelType: string; routeMode: string;
+      tripType: string; distanceKm: number; recommendedPrice: number; farePrice?: number;
+      totalCost: number; profit: number; margin: number; fuelType: string; routeMode: string;
+      desiredMarginPercent?: number;
     }[];
     sessions: { id: string; sessionId: string; createdAt: string; lastSeen: string; _count: { quotes: number } }[];
     feedback: { id: string; rating: number; category?: string; message?: string; createdAt: string }[];
@@ -519,7 +520,7 @@ export default function AdminPage() {
   const quotesPageTotal = quotesData?.totalPages ?? 1;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-white">
+    <div className="flex min-h-screen bg-zinc-950 text-white overflow-x-hidden">
       {/* Sidebar */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 lg:flex">
         <div className="sticky top-0 flex h-screen flex-col overflow-y-auto">
@@ -587,7 +588,7 @@ export default function AdminPage() {
       )}
 
       {/* Main content */}
-      <main className="min-w-0 flex-1 pt-14 lg:pt-0">
+      <main className="min-w-0 flex-1 overflow-x-hidden pt-14 lg:pt-0">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
           {error && (
             <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-400">
@@ -618,7 +619,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <KpiCard label="Cotações 7 dias" value={num(overview.quotesLast7)} color="default" />
                 <KpiCard label="Cotações 30 dias" value={num(overview.quotesLast30)} color="default" />
-                <KpiCard label="Preço médio" value={money(computed.avgTicket)} sub={`Lucro ${money(computed.avgProfit)}`} color="amber" />
+                <KpiCard label="Preço médio" value={money(computed.avgTicket)} sub={`Sobra ${money(computed.avgProfit)}`} color="amber" />
                 <KpiCard label="Taxa de conversão" value={`${computed.conversion.toFixed(1)}%`} sub="cotações por sessão" color="default" />
               </div>
 
@@ -665,25 +666,25 @@ export default function AdminPage() {
                 <Panel>
                   <SectionTitle>Cotações recentes</SectionTitle>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[500px] text-xs">
+                    <table className="w-full min-w-[380px] text-xs">
                       <thead>
                         <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
                           <th className="pb-2 text-left">Rota</th>
+                          <th className="pb-2 text-right">Taxímetro</th>
                           <th className="pb-2 text-right">Preço</th>
-                          <th className="pb-2 text-right">Lucro</th>
-                          <th className="pb-2 text-right">Data</th>
+                          <th className="pb-2 text-right">Sobra</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-800/60">
                         {recentActivity.quotes.slice(0, 8).map((q) => (
                           <tr key={q.id} className="cursor-pointer hover:bg-zinc-700/20" onClick={() => setSelectedQuote(q)}>
                             <td className="py-2 pr-3">
-                              <p className="max-w-[200px] truncate font-semibold text-zinc-200">{q.originAddress || '—'}</p>
-                              <p className="max-w-[200px] truncate text-[10px] text-zinc-500">→ {q.destinationAddress || '—'}</p>
+                              <p className="max-w-[160px] truncate font-semibold text-zinc-200">{q.originAddress || '—'}</p>
+                              <p className="max-w-[160px] truncate text-[10px] text-zinc-500">→ {q.destinationAddress || '—'}</p>
                             </td>
+                            <td className="py-2 text-right font-semibold text-zinc-500">{q.farePrice != null ? money(q.farePrice) : '—'}</td>
                             <td className="py-2 text-right font-black text-emerald-400">{money(q.recommendedPrice)}</td>
                             <td className={`py-2 text-right font-bold ${q.profit >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>{money(q.profit)}</td>
-                            <td className="py-2 text-right text-zinc-500">{fmtDate(q.createdAt)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -735,7 +736,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <KpiCard label="Preço recomendado" value={money(quoteAverages.recommendedPrice)} color="amber" />
                 <KpiCard label="Custo médio" value={money(quoteAverages.totalCost)} color="red" />
-                <KpiCard label="Lucro médio" value={money(quoteAverages.profit)} color="green" />
+                <KpiCard label="Sobra média" value={money(quoteAverages.profit)} color="green" />
                 <KpiCard label="Margem média" value={quoteAverages.margin != null ? `${quoteAverages.margin.toFixed(1)}%` : '—'} color="blue" />
                 <KpiCard label="Distância média" value={quoteAverages.distanceKm ? formatDistance(quoteAverages.distanceKm) : '—'} color="default" />
                 <KpiCard label="Tempo médio" value={quoteAverages.estimatedMinutes ? formatDuration(quoteAverages.estimatedMinutes) : '—'} color="default" />
@@ -1264,43 +1265,82 @@ export default function AdminPage() {
 // ─── Sub-components ───────────────────────────────────────────
 
 function QuoteModal({ quote, onClose }: { quote: AdminStats['recentActivity']['quotes'][0]; onClose: () => void }) {
+  const farePrice = quote.farePrice ?? 0;
+  const gainOverTaximeter = farePrice > 0 ? Math.max(0, quote.recommendedPrice - farePrice) : 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-zinc-700 px-5 py-4">
-          <div>
+          <div className="min-w-0 pr-3">
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-500">{fmtDate(quote.createdAt)}</p>
-            <p className="mt-0.5 text-sm font-black text-white">{quote.originAddress || '—'}</p>
-            <p className="text-xs font-semibold text-zinc-400">→ {quote.destinationAddress || '—'}</p>
+            <p className="mt-0.5 text-sm font-black text-white truncate">{quote.originAddress || '—'}</p>
+            <p className="text-xs font-semibold text-zinc-400 truncate">→ {quote.destinationAddress || '—'}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs font-black text-zinc-400 hover:bg-zinc-700">✕</button>
+          <button onClick={onClose} className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs font-black text-zinc-400 hover:bg-zinc-700">✕</button>
         </div>
-        <div className="px-5 py-5">
-          <div className="mb-4 grid grid-cols-3 gap-3">
-            {[
-              { label: 'Preço', value: formatCurrencyBRL(quote.recommendedPrice), color: 'text-emerald-400' },
-              { label: 'Custo', value: formatCurrencyBRL(quote.totalCost), color: 'text-rose-400' },
-              { label: 'Lucro', value: formatCurrencyBRL(quote.profit), color: quote.profit >= 0 ? 'text-sky-400' : 'text-rose-400' },
-            ].map((item) => (
-              <div key={item.label} className="rounded-xl border border-zinc-700/60 bg-zinc-800/60 px-3 py-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500">{item.label}</p>
-                <p className={`mt-1 text-base font-black tabular-nums ${item.color}`}>{item.value}</p>
-              </div>
-            ))}
+        <div className="px-5 py-5 space-y-4">
+
+          {/* Preço principal */}
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-500/70 mb-1">Preço cobrado</p>
+            <p className="text-2xl font-black text-amber-300 tabular-nums">{formatCurrencyBRL(quote.recommendedPrice)}</p>
           </div>
-          <div className="divide-y divide-zinc-800/60">
-            {[
-              { label: 'Distância', value: formatDistance(quote.distanceKm) },
-              { label: 'Margem', value: `${quote.margin.toFixed(1)}%` },
-              { label: 'Tipo', value: TRIP_TYPE_LABEL[quote.tripType] || quote.tripType },
-              { label: 'Combustível', value: FUEL_LABEL[quote.fuelType] || quote.fuelType },
-              { label: 'Modo de rota', value: quote.routeMode === 'automatic' ? 'Automático' : 'Manual' },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-2 text-xs">
-                <span className="font-semibold text-zinc-500">{item.label}</span>
-                <span className="font-black text-white">{item.value}</span>
+
+          {/* Composição do preço */}
+          {farePrice > 0 && (
+            <div>
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">Composição do preço</p>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between rounded-lg bg-zinc-800/60 px-3 py-2.5 text-xs">
+                  <span className="font-semibold text-zinc-400">Taxímetro estimado</span>
+                  <span className="font-black text-zinc-100 tabular-nums">{formatCurrencyBRL(farePrice)}</span>
+                </div>
+                {gainOverTaximeter > 0 && (
+                  <div className="flex items-center justify-between rounded-lg bg-zinc-800/60 px-3 py-2.5 text-xs">
+                    <span className="font-semibold text-zinc-400">Ganho acima do taxímetro</span>
+                    <span className="font-black text-emerald-400 tabular-nums">+ {formatCurrencyBRL(gainOverTaximeter)}</span>
+                  </div>
+                )}
+                {quote.desiredMarginPercent != null && quote.desiredMarginPercent > 0 && (
+                  <div className="flex items-center justify-between rounded-lg bg-zinc-800/60 px-3 py-2.5 text-xs">
+                    <span className="font-semibold text-zinc-400">% extra escolhido</span>
+                    <span className="font-black text-zinc-300">{quote.desiredMarginPercent.toFixed(0)}%</span>
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Custo / Sobra */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-zinc-700/60 bg-zinc-800/60 px-3 py-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500">Gasto estimado</p>
+              <p className="mt-1 text-base font-black tabular-nums text-rose-400">{formatCurrencyBRL(quote.totalCost)}</p>
+            </div>
+            <div className="rounded-xl border border-zinc-700/60 bg-zinc-800/60 px-3 py-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500">Sobra estimada</p>
+              <p className={`mt-1 text-base font-black tabular-nums ${quote.profit >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>{formatCurrencyBRL(quote.profit)}</p>
+            </div>
+          </div>
+
+          {/* Detalhes da corrida */}
+          <div>
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">Detalhes</p>
+            <div className="divide-y divide-zinc-800/60">
+              {[
+                { label: 'Distância', value: formatDistance(quote.distanceKm) },
+                { label: 'Margem', value: `${quote.margin.toFixed(1)}%` },
+                { label: 'Tipo', value: TRIP_TYPE_LABEL[quote.tripType] || quote.tripType },
+                { label: 'Combustível', value: FUEL_LABEL[quote.fuelType] || quote.fuelType },
+                { label: 'Modo de rota', value: quote.routeMode === 'automatic' ? 'Automático' : 'Manual' },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between py-2 text-xs">
+                  <span className="font-semibold text-zinc-500">{item.label}</span>
+                  <span className="font-black text-white">{item.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1317,28 +1357,27 @@ function QuotesTable({ rows, onSelect, page, totalPages, onPageChange }: {
   return (
     <div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px] text-xs">
+        <table className="w-full min-w-[700px] text-xs">
           <thead>
             <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
               <th className="pb-2 text-left">Data</th><th className="pb-2 text-left">Rota</th>
-              <th className="pb-2 text-right">Dist.</th><th className="pb-2 text-right">Preço</th>
-              <th className="pb-2 text-right">Custo</th><th className="pb-2 text-right">Lucro</th>
-              <th className="pb-2 text-right">Margem</th><th className="pb-2 text-left">Tipo</th>
+              <th className="pb-2 text-right">Dist.</th><th className="pb-2 text-right">Taxímetro</th>
+              <th className="pb-2 text-right">Preço final</th><th className="pb-2 text-right">Sobra</th>
+              <th className="pb-2 text-right">Tipo</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/60">
             {rows.map((q) => (
               <tr key={q.id} className="cursor-pointer align-top hover:bg-zinc-700/10 transition-colors" onClick={() => onSelect?.(q)}>
                 <td className="py-2 pr-3 whitespace-nowrap text-zinc-500">{fmtDate(q.createdAt)}</td>
-                <td className="py-2 pr-3 max-w-[220px]">
+                <td className="py-2 pr-3 max-w-[180px]">
                   <p className="truncate font-semibold text-zinc-200">{q.originAddress || '—'}</p>
                   <p className="truncate text-zinc-600">→ {q.destinationAddress || '—'}</p>
                 </td>
                 <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-400">{formatDistance(q.distanceKm)}</td>
+                <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-500">{q.farePrice != null ? formatCurrencyBRL(q.farePrice) : '—'}</td>
                 <td className="py-2 text-right whitespace-nowrap font-black text-emerald-400">{formatCurrencyBRL(q.recommendedPrice)}</td>
-                <td className="py-2 text-right whitespace-nowrap font-bold text-rose-400">{formatCurrencyBRL(q.totalCost)}</td>
                 <td className={`py-2 text-right whitespace-nowrap font-bold ${q.profit >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>{formatCurrencyBRL(q.profit)}</td>
-                <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-400">{q.margin.toFixed(1)}%</td>
                 <td className="py-2 pl-3 whitespace-nowrap font-semibold text-zinc-500">{TRIP_TYPE_LABEL[q.tripType] || q.tripType}</td>
               </tr>
             ))}

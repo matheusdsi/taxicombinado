@@ -57,7 +57,8 @@ export class GoogleMapsProvider implements MapProvider {
     const route = data.routes[0];
 
     const totalDistanceM = route.legs.reduce((sum, leg) => sum + leg.distance.value, 0);
-    const totalDurationS = route.legs.reduce(
+    const baseDurationS = route.legs.reduce((sum, leg) => sum + leg.duration.value, 0);
+    const trafficDurationS = route.legs.reduce(
       (sum, leg) => sum + (leg.duration_in_traffic ?? leg.duration).value,
       0
     );
@@ -71,7 +72,8 @@ export class GoogleMapsProvider implements MapProvider {
 
     return {
       distanceKm: totalDistanceM / 1000,
-      durationMinutes: totalDurationS / 60,
+      durationMinutes: trafficDurationS / 60,
+      baseDurationMinutes: baseDurationS / 60,
       polyline: route.overview_polyline.points,
       provider: 'google',
       steps,

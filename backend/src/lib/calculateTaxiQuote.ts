@@ -8,6 +8,9 @@ export interface QuoteInput {
   estimatedMinutes: number;
   tripType: TripType;
 
+  // Traffic extra minutes from API (duration_in_traffic - duration_normal), max(0, delta)
+  trafficExtraMinutes?: number;
+
   // Vehicle
   consumptionKmPerLiter: number;
   fuelPricePerLiter: number;
@@ -39,7 +42,8 @@ export type AlertType =
   | 'empty_return_enabled'
   | 'toll_missing'
   | 'high_margin'
-  | 'check_route';
+  | 'check_route'
+  | 'traffic_capped';
 
 export interface Alert {
   type: AlertType;
@@ -63,9 +67,13 @@ export interface QuoteResult {
   extraCosts: number;
   totalCost: number;
 
-  // Fare calculation
-  timeCharge: number;
-  farePrice: number;
+  // Fare breakdown
+  baseKmPrice: number;       // bandeirada + km * pricePerKm
+  timeCharge: number;        // manual waiting charge (estimatedMinutes)
+  trafficAddition: number;   // automatic traffic charge (capped at 20% of baseKmPrice)
+  trafficCapped: boolean;    // true if traffic cap was applied
+  trafficExtraMinutes: number;
+  farePrice: number;         // (baseKmPrice + timeCharge + trafficAddition) * flagMultiplier
 
   // Pricing
   minimumPrice: number;
@@ -104,6 +112,8 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     customChargedPrice,
   } = input;
 
+  const trafficExtraMinutes = Math.max(0, input.trafficExtraMinutes ?? 0);
+
   // Calculate return distance
   const returnDistanceKm = input.returnDistanceKm ?? distanceKm;
 
@@ -121,51 +131,55 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
 
   // ─── Cost Breakdown ───────────────────────────────────────────
 
-  // Fuel cost
   const fuelCost = (effectiveTotalDistance / consumptionKmPerLiter) * fuelPricePerLiter;
-
-  // Vehicle extra cost (depreciation, maintenance, etc.)
   const vehicleExtraCost = effectiveTotalDistance * vehicleExtraCostPerKm;
 
-  // Toll total
   let tollTotal = tollOutbound;
   if (tripType === 'round_trip' || tripType === 'empty_return') {
     tollTotal += tollReturnValue;
   }
 
-  // Total cost
   const totalCost = fuelCost + vehicleExtraCost + tollTotal + parkingCost + extraCosts;
 
   // ─── Fare Calculation ─────────────────────────────────────────
 
-  // Time charge
+  // Chargeable distance: round trips charge both legs; empty return only charges outbound
+  const chargeableDistanceKm = tripType === 'round_trip' ? effectiveTotalDistance : distanceKm;
+
+  // Base km price: bandeirada + km * rate (no multiplier yet)
+  const baseKmPrice = baseFare + chargeableDistanceKm * pricePerKm;
+
+  // Manual waiting charge (e.g., agreed waiting at destination for round_trip)
   let timeCharge: number;
   if (waitingChargeType === 'per_hour') {
     timeCharge = (estimatedMinutes / 60) * waitingPrice;
   } else {
-    // per_minute
     timeCharge = estimatedMinutes * waitingPrice;
   }
 
-  const chargeableDistanceKm = tripType === 'round_trip' ? effectiveTotalDistance : distanceKm;
+  // Automatic traffic addition — only the EXTRA time due to traffic, capped at 20% of base price
+  let rawTrafficAddition: number;
+  if (waitingChargeType === 'per_hour') {
+    rawTrafficAddition = (trafficExtraMinutes / 60) * waitingPrice;
+  } else {
+    rawTrafficAddition = trafficExtraMinutes * waitingPrice;
+  }
+  const maxTrafficAddition = baseKmPrice * 0.20;
+  const trafficAddition = Math.min(rawTrafficAddition, maxTrafficAddition);
+  const trafficCapped = rawTrafficAddition > 0 && rawTrafficAddition > maxTrafficAddition;
 
-  // Fare price = (baseFare + chargeable distance * pricePerKm + time charge) * flagMultiplier.
-  // Round trips charge both legs; empty returns only add the return leg to costs.
-  const farePrice = (baseFare + chargeableDistanceKm * pricePerKm + timeCharge) * flagMultiplier;
+  // Fare price applies flagMultiplier to everything
+  const farePrice = (baseKmPrice + timeCharge + trafficAddition) * flagMultiplier;
 
   // ─── Pricing Strategy ─────────────────────────────────────────
 
-  // Minimum price covers all costs plus driver minimum value
   const minimumPrice = totalCost + driverMinimumValue;
 
-  // Price with desired gain over the calculated taximeter fare.
   const cappedMargin = Math.min(desiredMarginPercent, 80);
   const priceWithMargin = farePrice * (1 + cappedMargin / 100);
 
-  // Recommended price is the maximum of taximeter + gain and the minimum cost floor.
   const recommendedPrice = Math.max(farePrice, priceWithMargin, minimumPrice);
 
-  // Ideal price: same taximeter markup formula with +15pp reserve (capped at 80%).
   const idealMarginPercent = Math.min(cappedMargin + 15, 80);
   const idealPriceByMargin = farePrice * (1 + idealMarginPercent / 100);
   const idealPrice = Math.max(idealPriceByMargin, recommendedPrice * 1.05);
@@ -183,7 +197,6 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
 
   const alerts: Alert[] = [];
 
-  // Empty return warning
   if (tripType === 'empty_return') {
     alerts.push({
       type: 'empty_return_enabled',
@@ -192,7 +205,6 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     });
   }
 
-  // Toll missing - if distance > 20km and no toll set
   if (effectiveTotalDistance > 20 && tollTotal === 0) {
     alerts.push({
       type: 'toll_missing',
@@ -201,7 +213,6 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     });
   }
 
-  // High margin warning
   if (desiredMarginPercent > 60) {
     alerts.push({
       type: 'high_margin',
@@ -210,7 +221,14 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     });
   }
 
-  // Negative profit
+  if (trafficCapped) {
+    alerts.push({
+      type: 'traffic_capped',
+      message: 'O adicional de trânsito foi limitado para não inflar demais o valor.',
+      severity: 'info',
+    });
+  }
+
   if (profit < 0) {
     alerts.push({
       type: 'negative_profit',
@@ -218,7 +236,6 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
       severity: 'error',
     });
   } else if (margin < 10 && profit >= 0) {
-    // Low profit
     alerts.push({
       type: 'low_profit',
       message: `Margem de lucro baixa (${margin.toFixed(1)}%). Considere aumentar o preço.`,
@@ -226,7 +243,6 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     });
   }
 
-  // Custom price below minimum
   if (customChargedPrice !== undefined && customChargedPrice < minimumPrice) {
     alerts.push({
       type: 'custom_price_below_minimum',
@@ -235,7 +251,6 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     });
   }
 
-  // Check route - if distance seems very short or very long
   if (distanceKm < 1) {
     alerts.push({
       type: 'check_route',
@@ -266,7 +281,11 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
     extraCosts: round2(extraCosts),
     totalCost: roundedTotalCost,
 
+    baseKmPrice: round2(baseKmPrice),
     timeCharge: round2(timeCharge),
+    trafficAddition: round2(trafficAddition),
+    trafficCapped,
+    trafficExtraMinutes,
     farePrice: round2(farePrice),
 
     minimumPrice: round2(minimumPrice),

@@ -13,6 +13,7 @@ export interface RouteStep {
 export interface RouteResult {
   distanceKm: number;
   durationMinutes: number;
+  baseDurationMinutes?: number;
   returnDistanceKm?: number;
   polyline?: string;
   provider: 'manual' | 'google' | 'mapbox';
