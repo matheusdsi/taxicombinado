@@ -189,7 +189,7 @@ function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: stri
 }
 
 function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-xl border border-zinc-700/50 bg-zinc-800/40 p-5 ${className}`}>{children}</div>;
+  return <div className={`min-w-0 overflow-x-hidden rounded-xl border border-zinc-700/50 bg-zinc-800/40 p-5 ${className}`}>{children}</div>;
 }
 
 function Bar({ label, count, total }: { label: string; count: number; total: number }) {
@@ -675,10 +675,10 @@ export default function AdminPage() {
               </div>
 
               {/* Recent quotes + recent leads */}
-              <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+              <div className="grid min-w-0 gap-5 lg:grid-cols-[1.4fr_1fr]">
                 <Panel>
                   <SectionTitle>Cotações recentes</SectionTitle>
-                  <div className="overflow-x-auto">
+                  <div className="-mx-5 overflow-x-auto px-5">
                     <table className="w-full min-w-[380px] text-xs">
                       <thead>
                         <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
@@ -887,7 +887,7 @@ export default function AdminPage() {
                 ) : filteredUsers.length === 0 ? (
                   <EmptyRow>Nenhum usuário encontrado.</EmptyRow>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="-mx-5 overflow-x-auto px-5">
                     <table className="w-full min-w-[700px] text-sm">
                       <thead>
                         <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
@@ -989,7 +989,7 @@ export default function AdminPage() {
                 {loadingPartners ? <EmptyRow>Carregando...</EmptyRow> : adminPartners.length === 0 ? <EmptyRow>Nenhum parceiro cadastrado.</EmptyRow> : (
                   <div className="space-y-4">
                     {adminPartners.map((partner) => (
-                      <div key={partner.id} className="rounded-xl border border-zinc-700/60 bg-zinc-800/30 p-4">
+                      <div key={partner.id} className="min-w-0 rounded-xl border border-zinc-700/60 bg-zinc-800/30 p-4">
                         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -1114,7 +1114,7 @@ export default function AdminPage() {
               <Panel>
                 <SectionTitle>Leads recentes</SectionTitle>
                 {partners.recentLeads.length === 0 ? <EmptyRow>Nenhum lead registrado.</EmptyRow> : (
-                  <div className="overflow-x-auto">
+                  <div className="-mx-5 overflow-x-auto px-5">
                     <table className="w-full min-w-[600px] text-xs">
                       <thead>
                         <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
@@ -1153,7 +1153,7 @@ export default function AdminPage() {
                 <p className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] font-semibold text-amber-500/80">
                   Cada linha é uma sessão de navegador distinta. Se um mesmo usuário recarregar sem cookie ativo, aparece como nova sessão — esperado para visitantes anônimos.
                 </p>
-                <div className="overflow-x-auto">
+                <div className="-mx-5 overflow-x-auto px-5">
                   <table className="w-full min-w-[600px] text-xs">
                     <thead>
                       <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
@@ -1413,7 +1413,7 @@ function QuotesTable({ rows, onSelect, page, totalPages, onPageChange }: {
   if (!rows.length) return <EmptyRow>Nenhuma cotação registrada.</EmptyRow>;
   return (
     <div>
-      <div className="overflow-x-auto">
+      <div className="-mx-5 overflow-x-auto px-5">
         <table className="w-full min-w-[820px] text-xs">
           <thead>
             <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
