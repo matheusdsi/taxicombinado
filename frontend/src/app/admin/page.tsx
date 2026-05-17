@@ -46,9 +46,11 @@ interface AdminStats {
   recentActivity: {
     quotes: {
       id: string; createdAt: string; originAddress?: string; destinationAddress?: string;
-      tripType: string; distanceKm: number; recommendedPrice: number; farePrice?: number;
+      tripType: string; distanceKm: number; totalDistanceKm?: number; recommendedPrice: number; farePrice?: number;
       totalCost: number; profit: number; margin: number; fuelType: string; routeMode: string;
       desiredMarginPercent?: number;
+      flagMultiplier?: number; baseFare?: number; pricePerKm?: number;
+      tollTotal?: number; parkingCost?: number; extraCosts?: number; fuelCost?: number;
     }[];
     sessions: { id: string; sessionId: string; createdAt: string; lastSeen: string; _count: { quotes: number } }[];
     feedback: { id: string; rating: number; category?: string; message?: string; createdAt: string }[];
@@ -285,6 +287,9 @@ export default function AdminPage() {
   const [selectedQuote, setSelectedQuote] = useState<AdminStats['recentActivity']['quotes'][0] | null>(null);
   const [quotesPage, setQuotesPage] = useState(1);
   const [quotesFilter, setQuotesFilter] = useState<'all' | 'today'>('all');
+  const [quotesBandFilter, setQuotesBandFilter] = useState<'all' | 'b1' | 'b2'>('all');
+  const [quotesCatFilter, setQuotesCatFilter] = useState<'all' | 'comum' | 'luxo'>('all');
+  const [quotesTripFilter, setQuotesTripFilter] = useState<'all' | 'one_way' | 'round_trip' | 'empty_return'>('all');
   const [quotesData, setQuotesData] = useState<{ quotes: AdminStats['recentActivity']['quotes']; total: number; totalPages: number } | null>(null);
   const [quotesLoading, setQuotesLoading] = useState(false);
   const [resetUser, setResetUser] = useState<AdminUser | null>(null);
@@ -516,7 +521,15 @@ export default function AdminPage() {
   const { overview, quoteAverages, breakdowns, timeSeries, geography, partners, recentActivity } = stats;
   const maxDailyQuotes = Math.max(1, ...timeSeries.quotesPerDay.map((d) => d.count));
   const alertTotal = breakdowns.alertsFrequency.reduce((s, i) => s + i.count, 0);
-  const quotesRows = quotesData?.quotes ?? recentActivity.quotes.slice(0, 20);
+  const quotesRowsRaw = quotesData?.quotes ?? recentActivity.quotes.slice(0, 20);
+  const quotesRows = quotesRowsRaw.filter((q) => {
+    if (quotesBandFilter === 'b1' && (q.flagMultiplier ?? 1) >= 1.3) return false;
+    if (quotesBandFilter === 'b2' && (q.flagMultiplier ?? 1) < 1.3) return false;
+    if (quotesCatFilter === 'comum' && (q.baseFare ?? 0) >= 9) return false;
+    if (quotesCatFilter === 'luxo' && (q.baseFare ?? 0) < 9) return false;
+    if (quotesTripFilter !== 'all' && q.tripType !== quotesTripFilter) return false;
+    return true;
+  });
   const quotesPageTotal = quotesData?.totalPages ?? 1;
 
   return (
@@ -807,14 +820,35 @@ export default function AdminPage() {
 
               {/* Quotes table */}
               <Panel>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <SectionTitle>Listagem de cotações</SectionTitle>
-                  <div className="flex gap-2">
-                    {(['today', 'all'] as const).map((f) => (
-                      <button key={f} onClick={() => { setQuotesFilter(f); setQuotesPage(1); }}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-black transition-all ${quotesFilter === f ? 'bg-amber-400 text-zinc-950' : 'border border-zinc-600 text-zinc-400 hover:bg-zinc-700/50'}`}>
-                        {f === 'today' ? `Hoje (${overview.quotesToday})` : `Todas (${quotesData?.total ?? overview.totalQuotes})`}
-                      </button>
+                <div className="mb-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <SectionTitle>Listagem de cotações</SectionTitle>
+                    <div className="flex gap-2">
+                      {(['today', 'all'] as const).map((f) => (
+                        <button key={f} onClick={() => { setQuotesFilter(f); setQuotesPage(1); }}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-black transition-all ${quotesFilter === f ? 'bg-amber-400 text-zinc-950' : 'border border-zinc-600 text-zinc-400 hover:bg-zinc-700/50'}`}>
+                          {f === 'today' ? `Hoje (${overview.quotesToday})` : `Todas (${quotesData?.total ?? overview.totalQuotes})`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Bandeira */}
+                    {([['all','Bandeira: Todas'],['b1','Bandeira 1'],['b2','Bandeira 2']] as const).map(([v,l]) => (
+                      <button key={v} onClick={() => setQuotesBandFilter(v)}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-black transition-all ${quotesBandFilter === v ? 'bg-sky-500/30 text-sky-300 ring-1 ring-sky-500/30' : 'border border-zinc-700 text-zinc-500 hover:text-zinc-300'}`}>{l}</button>
+                    ))}
+                    <span className="text-zinc-700">|</span>
+                    {/* Categoria */}
+                    {([['all','Categ: Todas'],['comum','Comum'],['luxo','Luxo']] as const).map(([v,l]) => (
+                      <button key={v} onClick={() => setQuotesCatFilter(v)}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-black transition-all ${quotesCatFilter === v ? 'bg-amber-500/30 text-amber-300 ring-1 ring-amber-500/30' : 'border border-zinc-700 text-zinc-500 hover:text-zinc-300'}`}>{l}</button>
+                    ))}
+                    <span className="text-zinc-700">|</span>
+                    {/* Tipo */}
+                    {([['all','Tipo: Todos'],['one_way','Só ida'],['round_trip','Ida/volta'],['empty_return','V. vazia']] as const).map(([v,l]) => (
+                      <button key={v} onClick={() => setQuotesTripFilter(v)}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-black transition-all ${quotesTripFilter === v ? 'bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-500/30' : 'border border-zinc-700 text-zinc-500 hover:text-zinc-300'}`}>{l}</button>
                     ))}
                   </div>
                 </div>
@@ -1329,9 +1363,12 @@ function QuoteModal({ quote, onClose }: { quote: AdminStats['recentActivity']['q
             <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">Detalhes</p>
             <div className="divide-y divide-zinc-800/60">
               {[
-                { label: 'Distância', value: formatDistance(quote.distanceKm) },
-                { label: 'Margem', value: `${quote.margin.toFixed(1)}%` },
-                { label: 'Tipo', value: TRIP_TYPE_LABEL[quote.tripType] || quote.tripType },
+                { label: 'Tipo de corrida', value: TRIP_TYPE_LABEL[quote.tripType] || quote.tripType },
+                { label: 'Categoria', value: quote.baseFare != null ? (quote.baseFare >= 9 ? 'Luxo' : 'Comum') : '—' },
+                { label: 'Bandeira', value: quote.flagMultiplier != null ? (quote.flagMultiplier >= 1.3 ? 'Bandeira 2' : 'Bandeira 1') : '—' },
+                { label: 'Distância (ida)', value: formatDistance(quote.distanceKm) },
+                { label: 'Distância total', value: quote.totalDistanceKm != null ? formatDistance(quote.totalDistanceKm) : '—' },
+                { label: 'Margem (sobra %)', value: `${quote.margin.toFixed(1)}%` },
                 { label: 'Combustível', value: FUEL_LABEL[quote.fuelType] || quote.fuelType },
                 { label: 'Modo de rota', value: quote.routeMode === 'automatic' ? 'Automático' : 'Manual' },
               ].map((item) => (
@@ -1342,6 +1379,26 @@ function QuoteModal({ quote, onClose }: { quote: AdminStats['recentActivity']['q
               ))}
             </div>
           </div>
+
+          {/* Custos detalhados */}
+          {(quote.tollTotal != null || quote.fuelCost != null) && (
+            <div>
+              <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">Custos detalhados</p>
+              <div className="divide-y divide-zinc-800/60">
+                {[
+                  { label: 'Combustível', value: quote.fuelCost },
+                  { label: 'Pedágio', value: quote.tollTotal },
+                  { label: 'Estacionamento', value: quote.parkingCost },
+                  { label: 'Outros extras', value: quote.extraCosts },
+                ].filter((r) => r.value != null && r.value > 0).map((r) => (
+                  <div key={r.label} className="flex items-center justify-between py-2 text-xs">
+                    <span className="font-semibold text-zinc-500">{r.label}</span>
+                    <span className="font-black text-zinc-300">{formatCurrencyBRL(r.value!)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1357,30 +1414,42 @@ function QuotesTable({ rows, onSelect, page, totalPages, onPageChange }: {
   return (
     <div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] text-xs">
+        <table className="w-full min-w-[820px] text-xs">
           <thead>
             <tr className="border-b border-zinc-700/60 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
               <th className="pb-2 text-left">Data</th><th className="pb-2 text-left">Rota</th>
               <th className="pb-2 text-right">Dist.</th><th className="pb-2 text-right">Taxímetro</th>
               <th className="pb-2 text-right">Preço final</th><th className="pb-2 text-right">Sobra</th>
               <th className="pb-2 text-right">Tipo</th>
+              <th className="pb-2 text-right">Categ.</th>
+              <th className="pb-2 text-right">Band.</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/60">
-            {rows.map((q) => (
-              <tr key={q.id} className="cursor-pointer align-top hover:bg-zinc-700/10 transition-colors" onClick={() => onSelect?.(q)}>
-                <td className="py-2 pr-3 whitespace-nowrap text-zinc-500">{fmtDate(q.createdAt)}</td>
-                <td className="py-2 pr-3 max-w-[180px]">
-                  <p className="truncate font-semibold text-zinc-200">{q.originAddress || '—'}</p>
-                  <p className="truncate text-zinc-600">→ {q.destinationAddress || '—'}</p>
-                </td>
-                <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-400">{formatDistance(q.distanceKm)}</td>
-                <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-500">{q.farePrice != null ? formatCurrencyBRL(q.farePrice) : '—'}</td>
-                <td className="py-2 text-right whitespace-nowrap font-black text-emerald-400">{formatCurrencyBRL(q.recommendedPrice)}</td>
-                <td className={`py-2 text-right whitespace-nowrap font-bold ${q.profit >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>{formatCurrencyBRL(q.profit)}</td>
-                <td className="py-2 pl-3 whitespace-nowrap font-semibold text-zinc-500">{TRIP_TYPE_LABEL[q.tripType] || q.tripType}</td>
-              </tr>
-            ))}
+            {rows.map((q) => {
+              const categoria = q.baseFare != null ? (q.baseFare >= 9 ? 'Luxo' : 'Comum') : '—';
+              const bandeira = q.flagMultiplier != null ? (q.flagMultiplier >= 1.3 ? 'B2' : 'B1') : '—';
+              return (
+                <tr key={q.id} className="cursor-pointer align-top hover:bg-zinc-700/10 transition-colors" onClick={() => onSelect?.(q)}>
+                  <td className="py-2 pr-3 whitespace-nowrap text-zinc-500">{fmtDate(q.createdAt)}</td>
+                  <td className="py-2 pr-3 max-w-[180px]">
+                    <p className="truncate font-semibold text-zinc-200">{q.originAddress || '—'}</p>
+                    <p className="truncate text-zinc-600">→ {q.destinationAddress || '—'}</p>
+                  </td>
+                  <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-400">{formatDistance(q.distanceKm)}</td>
+                  <td className="py-2 text-right whitespace-nowrap font-semibold text-zinc-500">{q.farePrice != null ? formatCurrencyBRL(q.farePrice) : '—'}</td>
+                  <td className="py-2 text-right whitespace-nowrap font-black text-emerald-400">{formatCurrencyBRL(q.recommendedPrice)}</td>
+                  <td className={`py-2 text-right whitespace-nowrap font-bold ${q.profit >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>{formatCurrencyBRL(q.profit)}</td>
+                  <td className="py-2 pl-3 whitespace-nowrap font-semibold text-zinc-500">{TRIP_TYPE_LABEL[q.tripType] || q.tripType}</td>
+                  <td className="py-2 pl-2 whitespace-nowrap">
+                    <Badge tone={categoria === 'Luxo' ? 'amber' : 'default'}>{categoria}</Badge>
+                  </td>
+                  <td className="py-2 pl-2 whitespace-nowrap">
+                    <Badge tone={bandeira === 'B2' ? 'blue' : 'default'}>{bandeira}</Badge>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

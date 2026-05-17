@@ -33,6 +33,8 @@ interface HistoryQuote {
   customChargedPrice?: number;
   fuelPricePerLiter?: number;
   consumptionKmPerLiter?: number;
+  flagMultiplier?: number;
+  baseFare?: number;
   profit: number;
   margin: number;
   alerts?: Array<{ message: string; severity: string }>;
@@ -103,6 +105,8 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                 <Pill tone="yellow">{tripTypeLabels[quote.tripType] || quote.tripType}</Pill>
+                {quote.baseFare != null && <Pill tone="yellow">{quote.baseFare >= 9 ? 'Luxo' : 'Comum'}</Pill>}
+                {quote.flagMultiplier != null && <Pill>{quote.flagMultiplier >= 1.3 ? 'Bandeira 2' : 'Bandeira 1'}</Pill>}
                 <Pill>{shortDate(quote.createdAt)}</Pill>
               </div>
               <h2 style={{ fontSize: 18, fontWeight: 900, color: 'var(--ink)', lineHeight: 1.2 }}>{routeTitle(quote)}</h2>
@@ -323,6 +327,8 @@ export default function HistoricoPage() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     <Pill>{tripTypeLabels[quote.tripType] || quote.tripType}</Pill>
+                    {quote.baseFare != null && <Pill tone="yellow">{quote.baseFare >= 9 ? 'Luxo' : 'Comum'}</Pill>}
+                    {quote.flagMultiplier != null && <Pill>{quote.flagMultiplier >= 1.3 ? 'Bandeira 2' : 'Bandeira 1'}</Pill>}
                     {quote.tripType === 'round_trip' && Number(quote.estimatedMinutes) > 30 ? <Pill tone="yellow">Com espera</Pill> : null}
                     {quote.profit < 0 ? <Pill tone="red">Deu prejuizo</Pill> : <Pill tone="green">Sobrou dinheiro</Pill>}
                     {quote.isLocal && <Pill>Local</Pill>}

@@ -7,6 +7,8 @@ import { formatCurrencyBRL, formatDistance, generateWhatsAppText } from '@/lib/f
 import { getMyGoal, MyGoalData } from '@/lib/myGoal';
 import { trackCtaClick, trackEvent } from '@/lib/analytics';
 
+const FEEDBACK_WHATSAPP = '5511954486369';
+
 interface QuoteResultCardProps {
   result: QuoteResult;
   quoteId: string;
@@ -160,11 +162,8 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
 
       {/* ─── Hero amarelo ─── */}
       <div className="tc-hero-yellow">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div style={{ marginBottom: 4 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(17,24,39,.7)' }}>Preço estimado</span>
-          <span style={{ background: 'rgba(17,24,39,.1)', color: 'var(--ink)', padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>
-            Sobra {Math.round(result.margin)}%
-          </span>
         </div>
         <div className="tc-money-xl">
           R$ {rec.int}<span className="cents">,{rec.dec}</span>
@@ -173,11 +172,10 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
           Estimativa baseada na bandeirada, quilometragem, bandeira selecionada e ajuste moderado de trânsito quando disponível.
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
           {[
-            { lab: 'CUSTO',  val: formatCurrencyBRL(result.totalCost),    color: undefined },
-            { lab: 'SOBRA',  val: formatCurrencyBRL(sobraEstimada),   color: sobraPositiva ? '#0F5132' : '#7F1D1D' },
-            { lab: 'POR KM', val: formatCurrencyBRL(result.recommendedPrice / Math.max(1, result.totalDistanceKm)), color: undefined },
+            { lab: 'CUSTO',  val: formatCurrencyBRL(result.totalCost),  color: undefined },
+            { lab: 'SOBRA ESTIMADA', val: formatCurrencyBRL(sobraEstimada), color: sobraPositiva ? '#0F5132' : '#7F1D1D' },
           ].map((it) => (
             <div key={it.lab} style={{ background: 'rgba(17,24,39,.09)', padding: '10px 8px', borderRadius: 12 }}>
               <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', color: 'rgba(17,24,39,.6)' }}>{it.lab}</div>
@@ -280,6 +278,15 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
                 <div style={{ marginTop: 4, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>
                     Incluindo ganho adicional de {formatCurrencyBRL(gainOverTaximeter)} sobre o taxímetro.
+                  </div>
+                </div>
+              )}
+
+              {/* Nota pedágio */}
+              {result.tollTotal > 0 && (
+                <div style={{ marginTop: 4, padding: '8px 12px', background: 'var(--blue-soft)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1E3A8A' }}>
+                    Pedágio de {formatCurrencyBRL(result.tollTotal)} entra nos seus custos e foi considerado no preço mínimo.
                   </div>
                 </div>
               )}
@@ -543,6 +550,39 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
             Ver
           </a>
         </div>
+      </div>
+
+      {/* ─── Feedback pós-cálculo ─── */}
+      <div className="tc-card" style={{ background: 'var(--gray-50)', borderColor: 'var(--gray-200)' }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--ink)', marginBottom: 4 }}>Achou o valor errado?</div>
+        <p style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 600, lineHeight: 1.45, margin: '0 0 12px' }}>
+          Entre em contato e nos ajude a evoluir a ferramenta.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            trackEvent('feedback_whatsapp_clicked', { quote_id: quoteId, recommended_price: result.recommendedPrice });
+            const tripLabel = result.tripType === 'one_way' ? 'Só ida' : result.tripType === 'round_trip' ? 'Ida e volta' : 'Volta vazia';
+            const lines = [
+              '📋 *Feedback de cotação — Taxi Combinado*',
+              '',
+              originAddress      ? `📍 Origem: ${originAddress}` : null,
+              destinationAddress ? `🏁 Destino: ${destinationAddress}` : null,
+              `💰 Valor calculado: ${formatCurrencyBRL(result.recommendedPrice)}`,
+              `🗺️ Tipo: ${tripLabel}`,
+              result.tollTotal > 0 ? `🛣️ Pedágio: ${formatCurrencyBRL(result.tollTotal)}` : null,
+              '',
+              'Quanto você cobraria nessa corrida? (responda abaixo)',
+            ].filter(Boolean).join('\n');
+            window.open(`https://wa.me/${FEEDBACK_WHATSAPP}?text=${encodeURIComponent(lines)}`, '_blank');
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#25D366', color: '#fff', border: 0, borderRadius: 12, padding: '10px 16px', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 2a10 10 0 0 0-8.6 15.07L2 22l5.07-1.32A10 10 0 1 0 12 2Zm5.27 14.27c-.22.62-1.27 1.17-1.78 1.22-.46.05-1.05.07-1.69-.1a13 13 0 0 1-1.83-.68 11.36 11.36 0 0 1-4.32-3.83c-.34-.5-1.18-1.58-1.18-3.02 0-1.43.74-2.13 1-2.43.27-.3.58-.37.78-.37l.56.01c.18 0 .42-.07.66.5l.93 2.27c.08.16.13.34.02.55l-.32.5c-.1.16-.22.34-.05.65.17.3.75 1.22 1.61 1.97 1.1.96 2.04 1.27 2.36 1.42.32.15.5.13.69-.08.18-.2.79-.92.99-1.24.2-.32.4-.27.68-.16.27.1 1.74.82 2.04.97.3.15.5.22.57.34.07.13.07.75-.16 1.37Z"/>
+          </svg>
+          Enviar feedback
+        </button>
       </div>
 
       {/* ─── Nova cotação ─── */}

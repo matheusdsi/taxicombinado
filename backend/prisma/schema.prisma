@@ -17,14 +17,15 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  vehicles           Vehicle[]
-  taxiFareProfiles   TaxiFareProfile[]
-  quotes             Quote[]
-  anonymousSessions  AnonymousSession[]
-  driverProfile      DriverProfile?
-  driverMonthlyCost  DriverMonthlyCost?
-  maintenanceLogs    MaintenanceLog[]
-  fuelLogs           FuelLog[]
+  vehicles              Vehicle[]
+  taxiFareProfiles      TaxiFareProfile[]
+  quotes                Quote[]
+  anonymousSessions     AnonymousSession[]
+  driverProfile         DriverProfile?
+  driverMonthlyCost     DriverMonthlyCost?
+  maintenanceLogs       MaintenanceLog[]
+  fuelLogs              FuelLog[]
+  driverPublicProfile   DriverPublicProfile?
 
   @@map("users")
 }
@@ -402,3 +403,64 @@ model RideRequest {
 
   @@map("ride_requests")
 }
+
+// Perfil público do taxista — LGPD: apenas dados que o próprio taxista decidiu tornar públicos
+model DriverPublicProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  slug        String   @unique // ex: joao-silva
+  displayName String   @map("display_name") // Nome público (pode diferir do nome real)
+  // Foto: apenas URL de imagem hospedada externamente. Não armazenamos binários.
+  photoUrl    String?  @map("photo_url")
+  city        String?
+  // WhatsApp: armazenado, visível só via link (não exposto diretamente na página)
+  whatsapp    String?
+  car         String?  // ex: "Toyota Corolla 2022"
+  // Categorias de serviço
+  catAirport  Boolean  @default(false) @map("cat_airport")
+  catExec     Boolean  @default(false) @map("cat_exec")
+  catLuxo     Boolean  @default(false) @map("cat_luxo")
+  catPet      Boolean  @default(false) @map("cat_pet")
+  cat7seats   Boolean  @default(false) @map("cat_7seats")
+  catTravel   Boolean  @default(false) @map("cat_travel")
+  bio         String?  @db.VarChar(280) // Observação curta
+  isActive    Boolean  @default(true) @map("is_active")
+  // LGPD: consentimento explícito do taxista para exibição pública
+  lgpdConsent Boolean  @default(false) @map("lgpd_consent")
+  lgpdConsentAt DateTime? @map("lgpd_consent_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedulingRequests SchedulingRequest[]
+
+  @@map("driver_public_profiles")
+}
+
+// Solicitação de agendamento feita pelo passageiro via perfil público
+model SchedulingRequest {
+  id              String   @id @default(uuid())
+  driverProfileId String   @map("driver_profile_id")
+  // Dados do passageiro — coletados com consentimento explícito no formulário
+  passengerName   String   @map("passenger_name")
+  // WhatsApp: hash SHA-256 + últimos 4 dígitos armazenados para contato, não expostos
+  passengerWhatsapp String  @map("passenger_whatsapp")
+  originAddress   String   @map("origin_address")
+  destinationAddress String @map("destination_address")
+  scheduledDate   String   @map("scheduled_date") // YYYY-MM-DD
+  scheduledTime   String   @map("scheduled_time") // HH:MM
+  passengerCount  Int      @default(1) @map("passenger_count")
+  luggageCount    Int      @default(0) @map("luggage_count")
+  notes           String?
+  // Status operacional
+  status          String   @default("pendente") // pendente | aceito | realizado | cancelado
+  // LGPD: passageiro consentiu com coleta dos dados
+  passengerConsent Boolean @default(false) @map("passenger_consent")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  driverProfile DriverPublicProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  @@map("scheduling_requests")
+}
+

@@ -165,6 +165,7 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
     },
   });
 
+  const [hasExtraGain, setHasExtraGain] = useState(false);
   const tripType = watch('tripType');
   const returnDistanceKm = watch('returnDistanceKm');
   const fuelType = watch('fuelType');
@@ -597,13 +598,46 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
           <Controller name="pricePerKm" control={control} render={({ field }) => (
             <MoneyInput label="Valor por km" value={field.value} onChange={field.onChange} />
           )} />
-          <Controller name="desiredMarginPercent" control={control} render={({ field }) => (
-            <NumberInput label="Ganho acima do taxímetro" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
-          )} />
         </div>
 
-        <div style={{ background: 'var(--blue-soft)', color: '#1E3A8A', borderRadius: 12, padding: '10px 12px', fontSize: 12, fontWeight: 700, lineHeight: 1.35 }}>
-          Esse percentual entra depois do valor do taxímetro. Ex.: taxímetro de R$ 100 + 20% = R$ 120, sempre respeitando seus custos mínimos.
+        {/* Ganho extra — opt-in */}
+        <div style={{ border: '1px solid var(--gray-200)', borderRadius: 12, padding: 12, background: 'var(--gray-50)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={hasExtraGain}
+              onChange={(e) => {
+                setHasExtraGain(e.target.checked);
+                if (!e.target.checked) setValue('desiredMarginPercent', 0, { shouldValidate: true });
+              }}
+              style={{ width: 18, height: 18, accentColor: 'var(--ink)', flexShrink: 0 }}
+            />
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>Adicionar ganho extra acima do taxímetro</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>Marque para incluir uma porcentagem de ganho além do taxímetro.</span>
+            </span>
+          </label>
+
+          {hasExtraGain && (
+            <>
+              <Controller name="desiredMarginPercent" control={control} render={({ field }) => (
+                <NumberInput label="Ganho acima do taxímetro (%)" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
+              )} />
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4 }}>
+                  <span>0%</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span>
+                </div>
+                <input type="range" min={0} max={80} step={5}
+                  value={desiredMarginPercent}
+                  onChange={(e) => setValue('desiredMarginPercent', Number(e.target.value))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div style={{ background: 'var(--blue-soft)', color: '#1E3A8A', borderRadius: 12, padding: '10px 12px', fontSize: 12, fontWeight: 700, lineHeight: 1.35 }}>
+                Esse percentual entra depois do valor do taxímetro. Ex.: taxímetro de R$ 100 + 20% = R$ 120, sempre respeitando seus custos mínimos.
+              </div>
+            </>
+          )}
         </div>
 
         {tripType === 'round_trip' && (
@@ -645,17 +679,6 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
             )}
           </div>
         )}
-
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4 }}>
-            <span>0%</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span>
-          </div>
-          <input type="range" min={0} max={80} step={5}
-            value={desiredMarginPercent}
-            onChange={(e) => setValue('desiredMarginPercent', Number(e.target.value))}
-            style={{ width: '100%' }}
-          />
-        </div>
 
         <Controller name="customChargedPrice" control={control} render={({ field }) => (
           <MoneyInput
