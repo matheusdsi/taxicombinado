@@ -85,7 +85,8 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
   const sobraEstimada = result.profit;
   const sobraPositiva = sobraEstimada > 0;
   const rec = splitMoney(result.recommendedPrice);
-  const gainOverTaximeter = Math.max(0, result.recommendedPrice - result.farePrice);
+  const chargeableExtras = result.tollTotal + result.parkingCost + result.extraCosts;
+  const gainOverTaximeter = Math.max(0, result.recommendedPrice - result.farePrice - chargeableExtras);
   const tripPricePerKm = result.recommendedPrice / Math.max(1, result.totalDistanceKm || result.distanceKm);
   const dailyGoalPercent = goal?.meta_diaria ? (result.recommendedPrice / goal.meta_diaria) * 100 : 0;
   const missingAfterTrip = goal?.meta_diaria ? Math.max(0, goal.meta_diaria - result.recommendedPrice) : 0;
@@ -189,8 +190,12 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
       <div className="tc-card">
         <div className="tc-section-title">Resumo no bolso</div>
         <MoneyLine label="Taxímetro estimado" value={result.farePrice} />
-        {gainOverTaximeter > 0 && <MoneyLine label="Ganho colocado em cima" value={gainOverTaximeter} />}
-        <MoneyLine label="Gasto para fazer a corrida" value={result.totalCost} />
+        {result.tollTotal > 0 && <MoneyLine label="+ Pedágio (repassado)" value={result.tollTotal} />}
+        {result.parkingCost > 0 && <MoneyLine label="+ Estacionamento (repassado)" value={result.parkingCost} />}
+        {result.extraCosts > 0 && <MoneyLine label="+ Outros extras" value={result.extraCosts} />}
+        {gainOverTaximeter > 0 && <MoneyLine label="+ Ganho adicional" value={gainOverTaximeter} />}
+        <MoneyLine label="= Preço estimado cobrado" value={result.recommendedPrice} tone="ink" />
+        <MoneyLine label="− Custo da corrida" value={result.totalCost} />
         <MoneyLine label="Sobra estimada para você" value={sobraEstimada} tone={sobraEstimada >= 0 ? 'green' : 'red'} />
       </div>
 
@@ -243,13 +248,25 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
                 />
               )}
 
-              {/* Step: Pedágio */}
+              {/* Step: Pedágio repassado ao passageiro */}
               {result.tollTotal > 0 && (() => { breakdownStep = breakdownStep + 1; return null; })()}
               {result.tollTotal > 0 && (
                 <BreakdownRow
                   step={breakdownStep}
-                  label="Pedágio"
+                  label="Pedágio (repassado ao passageiro)"
                   value={`+ ${formatCurrencyBRL(result.tollTotal)}`}
+                  sub="Somado por cima do taxímetro"
+                />
+              )}
+
+              {/* Step: Estacionamento */}
+              {result.parkingCost > 0 && (() => { breakdownStep = breakdownStep + 1; return null; })()}
+              {result.parkingCost > 0 && (
+                <BreakdownRow
+                  step={breakdownStep}
+                  label="Estacionamento (repassado)"
+                  value={`+ ${formatCurrencyBRL(result.parkingCost)}`}
+                  sub="Somado por cima do taxímetro"
                 />
               )}
 
@@ -278,15 +295,6 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
                 <div style={{ marginTop: 4, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>
                     Incluindo ganho adicional de {formatCurrencyBRL(gainOverTaximeter)} sobre o taxímetro.
-                  </div>
-                </div>
-              )}
-
-              {/* Nota pedágio */}
-              {result.tollTotal > 0 && (
-                <div style={{ marginTop: 4, padding: '8px 12px', background: 'var(--blue-soft)', borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1E3A8A' }}>
-                    Pedágio de {formatCurrencyBRL(result.tollTotal)} entra nos seus custos e foi considerado no preço mínimo.
                   </div>
                 </div>
               )}

@@ -173,15 +173,24 @@ export function calculateTaxiQuote(input: QuoteInput): QuoteResult {
 
   // ─── Pricing Strategy ─────────────────────────────────────────
 
-  const minimumPrice = totalCost + driverMinimumValue;
+  // Extras repassados ao passageiro (pedágio, estacionamento, outros) somam sobre o taxímetro
+  const chargeableExtras = tollTotal + parkingCost + extraCosts;
+
+  // Custo interno do motorista (combustível + desgaste + mínimo desejado), sem os extras repassados
+  const internalCost = fuelCost + vehicleExtraCost + driverMinimumValue;
+  const minimumPrice = internalCost + chargeableExtras;
 
   const cappedMargin = Math.min(desiredMarginPercent, 80);
-  const priceWithMargin = farePrice * (1 + cappedMargin / 100);
+  // Margem aplicada sobre o taxímetro; extras são somados depois
+  const priceWithMargin = farePrice * (1 + cappedMargin / 100) + chargeableExtras;
 
-  const recommendedPrice = Math.max(farePrice, priceWithMargin, minimumPrice);
+  // Preço base já considera taxímetro + extras cobráveis
+  const baseChargedPrice = farePrice + chargeableExtras;
+
+  const recommendedPrice = Math.max(baseChargedPrice, priceWithMargin, minimumPrice);
 
   const idealMarginPercent = Math.min(cappedMargin + 15, 80);
-  const idealPriceByMargin = farePrice * (1 + idealMarginPercent / 100);
+  const idealPriceByMargin = farePrice * (1 + idealMarginPercent / 100) + chargeableExtras;
   const idealPrice = Math.max(idealPriceByMargin, recommendedPrice * 1.05);
 
   // ─── Outcome ─────────────────────────────────────────────────
