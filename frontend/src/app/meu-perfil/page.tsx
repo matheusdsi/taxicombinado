@@ -293,7 +293,7 @@ export default function MeuPerfilPage() {
 
       {form.slug && (
         <div style={{ marginTop: 24 }}>
-          <Link href="/meu-perfil/agendamentos"
+          <Link href="/agendamentos"
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--yellow-soft)', border: '1px solid #FCEBA8', borderRadius: 14, padding: '14px 16px', textDecoration: 'none', color: 'var(--ink)' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 14 }}>Agendamentos recebidos</div>
