@@ -279,7 +279,7 @@ export function Table({ children, className = '' }: { children: React.ReactNode;
   );
 }
 
-export function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Th({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
   return (
     <th className={`px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap border-b border-gray-100 ${className}`}>
       {children}
@@ -287,7 +287,7 @@ export function Th({ children, className = '' }: { children: React.ReactNode; cl
   );
 }
 
-export function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Td({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
   return (
     <td className={`px-4 py-3.5 text-[13px] text-[#0F1623] border-b border-gray-50 ${className}`}>
       {children}
