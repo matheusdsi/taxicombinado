@@ -46,6 +46,9 @@ const schedulingSchema = z.object({
   passengerCount: z.number().int().min(1).max(10).default(1),
   luggageCount: z.number().int().min(0).max(20).default(0),
   notes: z.string().max(500).optional(),
+  estimatedPriceMin: z.number().positive().optional(),
+  estimatedPriceMax: z.number().positive().optional(),
+  estimatedDistanceKm: z.number().positive().optional(),
   passengerConsent: z.boolean().refine((v) => v === true, 'Consentimento obrigatório'),
 });
 
@@ -232,6 +235,9 @@ router.post('/:slug/schedule', async (req: Request, res: Response) => {
         passengerCount: data.passengerCount,
         luggageCount: data.luggageCount,
         notes: data.notes || null,
+        estimatedPriceMin: data.estimatedPriceMin ?? null,
+        estimatedPriceMax: data.estimatedPriceMax ?? null,
+        estimatedDistanceKm: data.estimatedDistanceKm ?? null,
         passengerConsent: data.passengerConsent,
         status: 'pendente',
       },

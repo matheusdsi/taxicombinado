@@ -128,6 +128,8 @@ export default function DriverPublicPage() {
       ``,
       `📍 Origem: ${form.originAddress}`,
       `🏁 Destino: ${form.destinationAddress}`,
+      estimate ? `📏 Distância: ~${estimate.distanceKm.toFixed(1)} km` : null,
+      estimate ? `💰 Estimativa: R$ ${estimate.min}–R$ ${estimate.max}` : null,
       ``,
       `📅 Data: ${dateFormatted}`,
       `⏰ Horário: ${form.scheduledTime}`,
@@ -161,6 +163,9 @@ export default function DriverPublicPage() {
           ...form,
           passengerCount: Number(form.passengerCount),
           luggageCount: Number(form.luggageCount),
+          estimatedPriceMin: estimate?.min ?? undefined,
+          estimatedPriceMax: estimate?.max ?? undefined,
+          estimatedDistanceKm: estimate?.distanceKm ?? undefined,
         }),
         api.get(`/api/profile/${slug}/whatsapp`, { params: { message: buildMsg() } }).catch(() => null),
       ]);

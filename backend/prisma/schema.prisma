@@ -452,6 +452,10 @@ model SchedulingRequest {
   passengerCount  Int      @default(1) @map("passenger_count")
   luggageCount    Int      @default(0) @map("luggage_count")
   notes           String?
+  // Estimativa de preço calculada no momento do agendamento
+  estimatedPriceMin    Float?   @map("estimated_price_min")
+  estimatedPriceMax    Float?   @map("estimated_price_max")
+  estimatedDistanceKm  Float?   @map("estimated_distance_km")
   // Status operacional
   status          String   @default("pendente") // pendente | aceito | realizado | cancelado
   // LGPD: passageiro consentiu com coleta dos dados
