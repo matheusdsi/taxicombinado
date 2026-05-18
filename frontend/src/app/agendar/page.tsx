@@ -6,17 +6,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { AddressInput } from '@/components/ui/AddressInput';
 import { api, calculateRoute } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
-
-// ─── Tarifa base padrão para estimativa ──────────────────────────
-const FARE = { baseFare: 6.55, pricePerKm: 4.8 };
-const MARGIN = 0.25;
-
-function estimatePrice(distanceKm: number, large: boolean) {
-  const base = FARE.baseFare + FARE.pricePerKm * distanceKm;
-  const min = Math.round(base * 0.9);
-  const max = Math.round(base * (1 + MARGIN) * (large ? 1.4 : 1));
-  return { min, max };
-}
+import { estimatePrice, FareEstimate } from '@/lib/fareEstimate';
 
 // ─── Small UI primitives ─────────────────────────────────────────
 
@@ -99,16 +89,23 @@ export default function AgendarPage() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [routeLoading, setRouteLoading] = useState(false);
-  const [estimate, setEstimate] = useState<{ min: number; max: number; distanceKm: number } | null>(null);
+  const [estimate, setEstimate] = useState<(FareEstimate & { distanceKm: number }) | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState('');
+  const distanceKmRef = useRef<number | null>(null);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const set = (key: keyof FormState, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const tryFetchRoute = useCallback((origin: string, dest: string, large: boolean) => {
+  const recalcEstimate = useCallback((distanceKm: number, date: string, time: string, large: boolean) => {
+    if (!date || !time) return;
+    const result = estimatePrice(distanceKm, date, time, large);
+    setEstimate({ ...result, distanceKm });
+  }, []);
+
+  const tryFetchRoute = useCallback((origin: string, dest: string, date: string, time: string, large: boolean) => {
     if (routeDebounce.current) clearTimeout(routeDebounce.current);
     if (origin.length < 5 || dest.length < 5) return;
     routeDebounce.current = setTimeout(async () => {
@@ -116,8 +113,8 @@ export default function AgendarPage() {
       try {
         const route = await calculateRoute(origin, dest);
         if (route.distanceKm) {
-          const { min, max } = estimatePrice(route.distanceKm, large);
-          setEstimate({ min, max, distanceKm: route.distanceKm });
+          distanceKmRef.current = route.distanceKm;
+          recalcEstimate(route.distanceKm, date, time, large);
         }
       } catch {
         // silently ignore — estimate is optional
@@ -125,22 +122,29 @@ export default function AgendarPage() {
         setRouteLoading(false);
       }
     }, 800);
-  }, []);
+  }, [recalcEstimate]);
 
   const handleAddressChange = (key: 'originAddress' | 'destinationAddress', value: string) => {
     set(key, value);
     const origin = key === 'originAddress' ? value : form.originAddress;
     const dest = key === 'destinationAddress' ? value : form.destinationAddress;
-    tryFetchRoute(origin, dest, form.needsLargeVehicle);
+    tryFetchRoute(origin, dest, form.scheduledDate, form.scheduledTime, form.needsLargeVehicle);
+  };
+
+  const handleDateTimeChange = (key: 'scheduledDate' | 'scheduledTime', value: string) => {
+    set(key, value);
+    if (distanceKmRef.current) {
+      const date = key === 'scheduledDate' ? value : form.scheduledDate;
+      const time = key === 'scheduledTime' ? value : form.scheduledTime;
+      if (date && time) recalcEstimate(distanceKmRef.current, date, time, form.needsLargeVehicle);
+    }
   };
 
   const handleLargeVehicle = (v: boolean) => {
     set('needsLargeVehicle', v);
-    if (estimate) {
-      const { min, max } = estimatePrice(estimate.distanceKm, v);
-      setEstimate((e) => e ? { ...e, min, max } : e);
+    if (distanceKmRef.current && form.scheduledDate && form.scheduledTime) {
+      recalcEstimate(distanceKmRef.current, form.scheduledDate, form.scheduledTime, v);
     }
-    tryFetchRoute(form.originAddress, form.destinationAddress, v);
   };
 
   const validate = (): boolean => {
@@ -281,11 +285,18 @@ export default function AgendarPage() {
               <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2.5 flex items-start gap-2">
                 <span className="text-amber-600 text-base mt-0.5">💰</span>
                 <div>
-                  <p className="text-xs font-bold text-amber-900">
-                    Estimativa: R$ {estimate.min}–R$ {estimate.max}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs font-bold text-amber-900">
+                      Estimativa: R$ {estimate.min}–R$ {estimate.max}
+                    </p>
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${estimate.bandeira === 2 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      Bandeira {estimate.bandeira}
+                    </span>
+                  </div>
                   <p className="text-xs text-amber-800 mt-0.5">
-                    ~{estimate.distanceKm.toFixed(1)} km · Apenas uma estimativa — o valor final será combinado com o motorista
+                    ~{estimate.distanceKm.toFixed(1)} km
+                    {estimate.bandeira === 2 ? ' · Bandeira 2 (noturno/fim de semana)' : ' · Bandeira 1 (horário comercial)'}
+                    {!form.scheduledDate || !form.scheduledTime ? ' · Preencha data e hora para estimativa exata' : ' · Valor final combinado com o motorista'}
                   </p>
                 </div>
               </div>
@@ -301,7 +312,7 @@ export default function AgendarPage() {
                   type="date"
                   min={today}
                   value={form.scheduledDate}
-                  onChange={(e) => set('scheduledDate', e.target.value)}
+                  onChange={(e) => handleDateTimeChange('scheduledDate', e.target.value)}
                   error={errors.scheduledDate}
                 />
               </Field>
@@ -309,7 +320,7 @@ export default function AgendarPage() {
                 <Input
                   type="time"
                   value={form.scheduledTime}
-                  onChange={(e) => set('scheduledTime', e.target.value)}
+                  onChange={(e) => handleDateTimeChange('scheduledTime', e.target.value)}
                   error={errors.scheduledTime}
                 />
               </Field>

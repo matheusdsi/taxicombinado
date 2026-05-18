@@ -4,12 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { api, calculateRoute } from '@/lib/api';
 import { AddressInput } from '@/components/ui/AddressInput';
-
-const FARE = { baseFare: 6.55, pricePerKm: 4.8 };
-function estimatePrice(distanceKm: number) {
-  const base = FARE.baseFare + FARE.pricePerKm * distanceKm;
-  return { min: Math.round(base * 0.9), max: Math.round(base * 1.25) };
-}
+import { estimatePrice, FareEstimate } from '@/lib/fareEstimate';
 
 interface PublicProfile {
   id: string;
@@ -73,11 +68,18 @@ export default function DriverPublicPage() {
   const [submitted, setSubmitted] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [estimate, setEstimate] = useState<{ min: number; max: number; distanceKm: number } | null>(null);
+  const [estimate, setEstimate] = useState<(FareEstimate & { distanceKm: number }) | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const distanceKmRef = useRef<number | null>(null);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const tryFetchRoute = useCallback((origin: string, dest: string) => {
+  const recalcEstimate = useCallback((distanceKm: number, date: string, time: string) => {
+    if (!date || !time) return;
+    const result = estimatePrice(distanceKm, date, time);
+    setEstimate({ ...result, distanceKm });
+  }, []);
+
+  const tryFetchRoute = useCallback((origin: string, dest: string, date: string, time: string) => {
     if (routeDebounce.current) clearTimeout(routeDebounce.current);
     if (origin.length < 5 || dest.length < 5) return;
     routeDebounce.current = setTimeout(async () => {
@@ -85,8 +87,8 @@ export default function DriverPublicPage() {
       try {
         const route = await calculateRoute(origin, dest);
         if (route.distanceKm) {
-          const { min, max } = estimatePrice(route.distanceKm);
-          setEstimate({ min, max, distanceKm: route.distanceKm });
+          distanceKmRef.current = route.distanceKm;
+          recalcEstimate(route.distanceKm, date, time);
         }
       } catch {
         // estimativa opcional
@@ -94,7 +96,7 @@ export default function DriverPublicPage() {
         setRouteLoading(false);
       }
     }, 800);
-  }, []);
+  }, [recalcEstimate]);
 
   useEffect(() => {
     api.get(`/api/profile/${slug}`).then((res) => {
@@ -110,7 +112,12 @@ export default function DriverPublicPage() {
       if (key === 'originAddress' || key === 'destinationAddress') {
         const origin = key === 'originAddress' ? String(value) : f.originAddress;
         const dest = key === 'destinationAddress' ? String(value) : f.destinationAddress;
-        tryFetchRoute(origin, dest);
+        tryFetchRoute(origin, dest, next.scheduledDate, next.scheduledTime);
+      }
+      if ((key === 'scheduledDate' || key === 'scheduledTime') && distanceKmRef.current) {
+        const date = key === 'scheduledDate' ? String(value) : f.scheduledDate;
+        const time = key === 'scheduledTime' ? String(value) : f.scheduledTime;
+        if (date && time) recalcEstimate(distanceKmRef.current, date, time);
       }
       return next;
     });
@@ -298,11 +305,19 @@ export default function DriverPublicPage() {
             <div style={{ background: '#FEFCE8', border: '1.5px solid #FDE68A', borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>💰</span>
               <div>
-                <div style={{ fontWeight: 800, fontSize: 13, color: '#92400E' }}>
-                  Estimativa: R$ {estimate.min}–R$ {estimate.max}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#92400E' }}>
+                    Estimativa: R$ {estimate.min}–R$ {estimate.max}
+                  </span>
+                  <span style={{ background: estimate.bandeira === 2 ? '#FEE2E2' : '#DCFCE7', color: estimate.bandeira === 2 ? '#991B1B' : '#166534', borderRadius: 6, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>
+                    Bandeira {estimate.bandeira}
+                  </span>
                 </div>
                 <div style={{ fontSize: 11, color: '#B45309', marginTop: 3, fontWeight: 600, lineHeight: 1.4 }}>
-                  ~{estimate.distanceKm.toFixed(1)} km · Apenas uma estimativa — o valor final será combinado diretamente com o taxista.
+                  ~{estimate.distanceKm.toFixed(1)} km
+                  {estimate.bandeira === 2 ? ' · Bandeira 2 aplicada (noturno/fim de semana)' : ' · Bandeira 1 (horário comercial)'}
+                  {' · '}Valor final combinado com o taxista
+                  {!form.scheduledDate || !form.scheduledTime ? ' · Preencha data e hora para estimativa exata' : ''}
                 </div>
               </div>
             </div>
