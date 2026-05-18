@@ -715,6 +715,99 @@ router.post('/users/:id/reset-password', async (req: Request, res: Response) => 
   }
 });
 
+// ─── GET /api/admin/ride-requests ─────────────────────────────
+router.get('/ride-requests', async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10));
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10)));
+    const status = req.query.status ? String(req.query.status) : undefined;
+
+    const where: Record<string, unknown> = {};
+    if (status && status !== 'all') where.status = status;
+
+    const [total, rides] = await Promise.all([
+      prisma.rideRequest.count({ where }),
+      prisma.rideRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          passengerName: true,
+          passengerPhone: true,
+          originAddress: true,
+          destinationAddress: true,
+          scheduledDate: true,
+          scheduledTime: true,
+          passengerCount: true,
+          needsLargeVehicle: true,
+          needsAccessibility: true,
+          hasLuggage: true,
+          notes: true,
+          estimatedPriceMin: true,
+          estimatedPriceMax: true,
+          estimatedDistanceKm: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    const stats = await prisma.rideRequest.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+
+    const byStatus = stats.reduce<Record<string, number>>((acc, s) => {
+      acc[s.status] = s._count._all;
+      return acc;
+    }, {});
+
+    const valueAgg = await prisma.rideRequest.aggregate({
+      _avg: { estimatedPriceMin: true, estimatedPriceMax: true },
+      _sum: { estimatedPriceMin: true, estimatedPriceMax: true },
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        rides,
+        total,
+        totalPages: Math.ceil(total / limit),
+        byStatus,
+        avgPriceMin: round2(valueAgg._avg.estimatedPriceMin),
+        avgPriceMax: round2(valueAgg._avg.estimatedPriceMax),
+        sumPriceMin: round2(valueAgg._sum.estimatedPriceMin),
+        sumPriceMax: round2(valueAgg._sum.estimatedPriceMax),
+      },
+    });
+  } catch (error) {
+    console.error('Admin ride-requests error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar agendamentos' });
+  }
+});
+
+// ─── PATCH /api/admin/ride-requests/:id ───────────────────────
+router.patch('/ride-requests/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body as { status?: string };
+    const allowed = ['new', 'confirmed', 'cancelled', 'completed'];
+    if (!status || !allowed.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status inválido' });
+    }
+    const ride = await prisma.rideRequest.update({
+      where: { id },
+      data: { status },
+    });
+    return res.json({ success: true, data: ride });
+  } catch (error) {
+    console.error('Admin ride-request update error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao atualizar agendamento' });
+  }
+});
+
 function round2(n: number | null | undefined): number | null {
   if (n == null) return null;
   return Math.round(n * 100) / 100;

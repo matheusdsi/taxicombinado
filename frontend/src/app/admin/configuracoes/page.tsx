@@ -27,19 +27,19 @@ function Toggle({ checked, onChange, label, description }: { checked: boolean; o
 
 const TARIFF_SECTIONS = [
   {
-    title: 'Tarifas — Comum (Bandeira 1)',
+    title: 'Tarifas padrão (valores default do sistema)',
     rows: [
-      { label: 'Bandeirada', value: 'R$ 5,50', editable: false },
-      { label: 'Km rodado', value: 'R$ 2,75/km', editable: false },
-      { label: 'Hora parada', value: 'R$ 28,00/h', editable: false },
+      { label: 'Bandeirada (base)', value: 'R$ 6,55' },
+      { label: 'Preço por km', value: 'R$ 4,80/km' },
+      { label: 'Hora parada (espera)', value: 'R$ 55,50/h' },
     ],
   },
   {
-    title: 'Tarifas — Comum (Bandeira 2)',
+    title: 'Bandeira 2 (multiplicador ×1,2)',
     rows: [
-      { label: 'Bandeirada', value: 'R$ 5,50', editable: false },
-      { label: 'Km rodado', value: 'R$ 3,30/km', editable: false },
-      { label: 'Hora parada', value: 'R$ 33,00/h', editable: false },
+      { label: 'Bandeirada (base)', value: 'R$ 6,55' },
+      { label: 'Preço por km', value: 'R$ 5,76/km' },
+      { label: 'Hora parada (espera)', value: 'R$ 66,60/h' },
     ],
   },
 ];
@@ -98,25 +98,34 @@ export default function ConfiguracoesPage() {
           </Card>
 
           {/* Tarifas (informativo) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {TARIFF_SECTIONS.map((s) => (
-              <Card key={s.title} title={s.title}>
-                <div className="mt-3 space-y-0">
-                  {s.rows.map((r) => (
-                    <div key={r.label} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                      <span className="text-[13px] text-gray-600">{r.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-semibold text-[#0F1623]">{r.value}</span>
-                        {!r.editable && (
-                          <span className="text-[10px] bg-gray-100 text-gray-400 rounded px-1.5 py-0.5">Tabela SP</span>
-                        )}
+          <Card title="Tarifas de referência (Tabela SP)" subtitle="Apenas informativo — não afetam nenhum cálculo do sistema">
+            <div className="mt-3 mb-4 flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+              <svg className="shrink-0 mt-0.5" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth={2}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <p className="text-[12px] text-blue-700">
+                <strong>Estes valores não são configuráveis e não afetam nenhuma cotação.</strong> Cada taxista insere suas próprias tarifas diretamente no formulário de cotação. O sistema apenas recebe esses valores como entrada e calcula o preço — não há tarifa global configurada aqui.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {TARIFF_SECTIONS.map((s) => (
+                <div key={s.title} className="rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                    <p className="text-[12px] font-semibold text-gray-500">{s.title}</p>
+                  </div>
+                  <div className="px-4">
+                    {s.rows.map((r) => (
+                      <div key={r.label} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                        <span className="text-[13px] text-gray-500">{r.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium text-gray-600">{r.value}</span>
+                          <span className="text-[10px] bg-gray-100 text-gray-400 rounded px-1.5 py-0.5">ref. only</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Card>
 
           {/* Trânsito */}
           <Card title="Regras de trânsito" subtitle="Configuração do adicional de trânsito">
