@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, calculateRoute } from '@/lib/api';
 import { AddressInput } from '@/components/ui/AddressInput';
+
+const FARE = { baseFare: 6.55, pricePerKm: 4.8 };
+function estimatePrice(distanceKm: number) {
+  const base = FARE.baseFare + FARE.pricePerKm * distanceKm;
+  return { min: Math.round(base * 0.9), max: Math.round(base * 1.25) };
+}
 
 interface PublicProfile {
   id: string;
@@ -67,6 +73,28 @@ export default function DriverPublicPage() {
   const [submitted, setSubmitted] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [estimate, setEstimate] = useState<{ min: number; max: number; distanceKm: number } | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const tryFetchRoute = useCallback((origin: string, dest: string) => {
+    if (routeDebounce.current) clearTimeout(routeDebounce.current);
+    if (origin.length < 5 || dest.length < 5) return;
+    routeDebounce.current = setTimeout(async () => {
+      setRouteLoading(true);
+      try {
+        const route = await calculateRoute(origin, dest);
+        if (route.distanceKm) {
+          const { min, max } = estimatePrice(route.distanceKm);
+          setEstimate({ min, max, distanceKm: route.distanceKm });
+        }
+      } catch {
+        // estimativa opcional
+      } finally {
+        setRouteLoading(false);
+      }
+    }, 800);
+  }, []);
 
   useEffect(() => {
     api.get(`/api/profile/${slug}`).then((res) => {
@@ -77,7 +105,15 @@ export default function DriverPublicPage() {
   }, [slug]);
 
   const set = (key: keyof ScheduleForm, value: string | number | boolean) => {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      if (key === 'originAddress' || key === 'destinationAddress') {
+        const origin = key === 'originAddress' ? String(value) : f.originAddress;
+        const dest = key === 'destinationAddress' ? String(value) : f.destinationAddress;
+        tryFetchRoute(origin, dest);
+      }
+      return next;
+    });
   };
 
   const buildMsg = () => {
@@ -246,6 +282,27 @@ export default function DriverPublicPage() {
             placeholder="Para onde vai"
           />
 
+          {/* Estimativa de preço */}
+          {routeLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--gray-400)', fontWeight: 600 }}>
+              <div style={{ width: 12, height: 12, border: '2px solid var(--gray-300)', borderTopColor: 'var(--ink)', borderRadius: '50%', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} />
+              Calculando estimativa...
+            </div>
+          )}
+          {estimate && !routeLoading && (
+            <div style={{ background: '#FEFCE8', border: '1.5px solid #FDE68A', borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>💰</span>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, color: '#92400E' }}>
+                  Estimativa: R$ {estimate.min}–R$ {estimate.max}
+                </div>
+                <div style={{ fontSize: 11, color: '#B45309', marginTop: 3, fontWeight: 600, lineHeight: 1.4 }}>
+                  ~{estimate.distanceKm.toFixed(1)} km · Apenas uma estimativa — o valor final será combinado diretamente com o taxista.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <FField label="Data *">
               <input value={form.scheduledDate} onChange={(e) => set('scheduledDate', e.target.value)} required type="date" style={inp} />
@@ -313,7 +370,7 @@ export default function DriverPublicPage() {
               Abrir WhatsApp de {profile.displayName.split(' ')[0]}
             </a>
           )}
-          <button type="button" onClick={() => { setSubmitted(false); setWhatsappLink(null); setForm(EMPTY_FORM); }}
+          <button type="button" onClick={() => { setSubmitted(false); setWhatsappLink(null); setForm(EMPTY_FORM); setEstimate(null); }}
             style={{ display: 'block', margin: '12px auto 0', background: 'transparent', color: '#14532D', border: 0, fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
             Fazer outra solicitação
           </button>

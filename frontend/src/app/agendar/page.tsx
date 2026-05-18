@@ -278,14 +278,14 @@ export default function AgendarPage() {
               </div>
             )}
             {estimate && !routeLoading && (
-              <div className="bg-taxi-50 border border-taxi-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
-                <span className="text-taxi-600 text-base mt-0.5">💰</span>
+              <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                <span className="text-amber-600 text-base mt-0.5">💰</span>
                 <div>
-                  <p className="text-xs font-bold text-taxi-700">
+                  <p className="text-xs font-bold text-amber-900">
                     Estimativa: R$ {estimate.min}–R$ {estimate.max}
                   </p>
-                  <p className="text-xs text-taxi-600 mt-0.5">
-                    ~{estimate.distanceKm.toFixed(1)} km · Valor final negociado com o motorista
+                  <p className="text-xs text-amber-800 mt-0.5">
+                    ~{estimate.distanceKm.toFixed(1)} km · Apenas uma estimativa — o valor final será combinado com o motorista
                   </p>
                 </div>
               </div>
