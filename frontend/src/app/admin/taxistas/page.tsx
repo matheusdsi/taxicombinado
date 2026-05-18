@@ -13,8 +13,26 @@ interface AdminUser {
   role: string; createdAt: string; totalQuotes: number; lastQuoteAt: string | null;
 }
 
+interface AnonSession {
+  id: string; sessionId: string; createdAt: string; lastSeen: string;
+  userAgent: string | null; totalQuotes: number;
+}
+
+function deviceLabel(ua: string | null): string {
+  if (!ua) return 'Dispositivo desconhecido';
+  if (/iPhone/i.test(ua)) return 'iPhone';
+  if (/iPad/i.test(ua)) return 'iPad';
+  if (/Android/i.test(ua) && /Mobile/i.test(ua)) return 'Android Mobile';
+  if (/Android/i.test(ua)) return 'Android Tablet';
+  if (/Windows/i.test(ua)) return 'Windows';
+  if (/Mac/i.test(ua)) return 'Mac';
+  if (/Linux/i.test(ua)) return 'Linux';
+  return 'Outro';
+}
+
 export default function TaxistasPage() {
   const [drivers, setDrivers] = useState<AdminUser[]>([]);
+  const [anonSessions, setAnonSessions] = useState<AnonSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('quotes');
@@ -23,11 +41,18 @@ export default function TaxistasPage() {
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(apiUrl('/api/admin/users'), { credentials: 'include' });
-      if (res.status === 401) { window.location.href = '/admin/login'; return; }
-      const json = await res.json();
-      const all: AdminUser[] = json.data ?? [];
+      const [usersRes, anonRes] = await Promise.all([
+        fetch(apiUrl('/api/admin/users'), { credentials: 'include' }),
+        fetch(apiUrl('/api/admin/anonymous-sessions'), { credentials: 'include' }),
+      ]);
+      if (usersRes.status === 401) { window.location.href = '/admin/login'; return; }
+      const usersJson = await usersRes.json();
+      const all: AdminUser[] = usersJson.data ?? [];
       setDrivers(all.filter((u) => u.role === 'driver'));
+      if (anonRes.ok) {
+        const anonJson = await anonRes.json();
+        setAnonSessions((anonJson.data ?? []).filter((s: AnonSession) => s.totalQuotes > 0));
+      }
     } catch { /* silent */ } finally { setLoading(false); }
   }, []);
 
@@ -72,31 +97,69 @@ export default function TaxistasPage() {
         />
       </div>
 
-      {/* Ranking */}
-      {stats.total > 0 && (
-        <Card title="Ranking de taxistas" subtitle="Por número de cotações realizadas" className="mb-6">
-          <div className="mt-4 space-y-2">
-            {[...drivers].sort((a, b) => b.totalQuotes - a.totalQuotes).slice(0, 5).map((d, i) => {
-              const max = drivers[0]?.totalQuotes || 1;
-              const pct = Math.max(4, Math.round((d.totalQuotes / Math.max(1, ...drivers.map(x => x.totalQuotes))) * 100));
-              return (
-                <div key={d.id} className="flex items-center gap-3">
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold ${i === 0 ? 'bg-[#F5B800] text-[#0F1623]' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[13px] font-semibold text-[#0F1623] truncate">{d.name || d.email || '—'}</span>
-                      <span className="text-[13px] font-bold text-[#0F1623] ml-2 shrink-0">{num(d.totalQuotes)} cotações</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${i === 0 ? 'bg-[#F5B800]' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
+      {/* Rankings side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Ranking taxistas cadastrados */}
+        <Card title="Ranking de taxistas" subtitle="Por número de cotações realizadas">
+          {drivers.length === 0 ? (
+            <div className="mt-4"><EmptyState title="Nenhum taxista cadastrado" /></div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {[...drivers].sort((a, b) => b.totalQuotes - a.totalQuotes).slice(0, 8).map((d, i) => {
+                const pct = Math.max(4, Math.round((d.totalQuotes / Math.max(1, ...drivers.map(x => x.totalQuotes))) * 100));
+                return (
+                  <div key={d.id} className="flex items-center gap-3">
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold ${i === 0 ? 'bg-[#F5B800] text-[#0F1623]' : 'bg-gray-100 text-gray-500'}`}>{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[13px] font-semibold text-[#0F1623] truncate">{d.name || d.email || '—'}</span>
+                        <span className="text-[12px] font-bold text-[#0F1623] ml-2 shrink-0">{num(d.totalQuotes)}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${i === 0 ? 'bg-[#F5B800]' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
-      )}
+
+        {/* Ranking usuários anônimos */}
+        <Card title="Ranking anônimos" subtitle="Sessões sem cadastro com mais cotações">
+          {anonSessions.length === 0 ? (
+            <div className="mt-4"><EmptyState title="Nenhuma sessão anônima com cotações" /></div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {[...anonSessions].sort((a, b) => b.totalQuotes - a.totalQuotes).slice(0, 8).map((s, i) => {
+                const pct = Math.max(4, Math.round((s.totalQuotes / Math.max(1, ...anonSessions.map(x => x.totalQuotes))) * 100));
+                const shortId = s.sessionId.slice(0, 8);
+                return (
+                  <div key={s.id} className="flex items-center gap-3">
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold ${i === 0 ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-400'}`}>{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="min-w-0">
+                          <span className="text-[12px] font-semibold text-gray-600 font-mono">{shortId}…</span>
+                          <span className="ml-2 text-[10px] text-gray-400">{deviceLabel(s.userAgent)}</span>
+                        </div>
+                        <span className="text-[12px] font-bold text-[#0F1623] ml-2 shrink-0">{num(s.totalQuotes)}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-gray-300 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="text-[11px] text-gray-400 pt-1">
+                {anonSessions.length} sessão{anonSessions.length !== 1 ? 'ões' : ''} anônima{anonSessions.length !== 1 ? 's' : ''} com cotações
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
 
       <Card noPad>
         <div className="flex flex-wrap items-center gap-3 px-5 pt-5 pb-4 border-b border-gray-100">

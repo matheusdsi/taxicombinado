@@ -649,6 +649,37 @@ router.patch('/partner-locations/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/admin/anonymous-sessions ───────────────────────
+router.get('/anonymous-sessions', async (_req: Request, res: Response) => {
+  try {
+    const sessions = await prisma.anonymousSession.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        sessionId: true,
+        createdAt: true,
+        lastSeen: true,
+        userAgent: true,
+        _count: { select: { quotes: true } },
+      },
+    });
+
+    const result = sessions.map((s) => ({
+      id: s.id,
+      sessionId: s.sessionId,
+      createdAt: s.createdAt,
+      lastSeen: s.lastSeen,
+      userAgent: s.userAgent,
+      totalQuotes: s._count.quotes,
+    }));
+
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('Admin anonymous sessions error:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar sessões' });
+  }
+});
+
 // ─── GET /api/admin/users ─────────────────────────────────────
 router.get('/users', async (_req: Request, res: Response) => {
   try {
