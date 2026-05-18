@@ -93,7 +93,7 @@ export function Header() {
             }}
             aria-label={open ? 'Fechar menu' : 'Abrir menu'}
             className="flex flex-col items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
-            style={{ gap: 6 }}
+            style={{ gap: 5 }}
           >
             <span
               className="block h-0.5 bg-gray-700 transition-all duration-200 origin-center"
@@ -126,8 +126,8 @@ export function Header() {
               className="flex items-center gap-1.5 text-xs font-semibold bg-taxi-500 text-gray-900 px-3 py-1.5 rounded-full hover:bg-taxi-600 transition-colors shrink-0"
             >
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2"/>
-                <path d="M16 2v4M8 2v4M3 10h18"/>
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
               </svg>
               Agendar
             </Link>
@@ -149,8 +149,8 @@ export function Header() {
                 className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500 shrink-0 hover:bg-gray-200 transition-colors"
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="8" r="4"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                 </svg>
               </Link>
             )}
@@ -218,9 +218,9 @@ export function Header() {
               style={{ fontSize: 15, fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', borderTop: '1px solid #f3f4f6', marginTop: 8, paddingTop: 16 }}
             >
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
               Sair
             </button>

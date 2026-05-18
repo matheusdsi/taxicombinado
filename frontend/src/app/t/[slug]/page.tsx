@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { AddressInput } from '@/components/ui/AddressInput';
 
 interface PublicProfile {
   id: string;
@@ -79,56 +80,67 @@ export default function DriverPublicPage() {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
+  const buildMsg = () => {
+    const dateFormatted = form.scheduledDate
+      ? new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')
+      : form.scheduledDate;
+    return [
+      `🚖 *Novo agendamento recebido!*`,
+      ``,
+      `👤 Cliente: ${form.passengerName}`,
+      `📱 WhatsApp: ${form.passengerWhatsapp}`,
+      ``,
+      `📍 Origem: ${form.originAddress}`,
+      `🏁 Destino: ${form.destinationAddress}`,
+      ``,
+      `📅 Data: ${dateFormatted}`,
+      `⏰ Horário: ${form.scheduledTime}`,
+      `👥 Passageiros: ${form.passengerCount}`,
+      form.luggageCount > 0 ? `🧳 Malas: ${form.luggageCount}` : null,
+      form.notes ? `📝 Obs: ${form.notes}` : null,
+      ``,
+      `Responda para confirmar ou recusar.`,
+    ].filter(Boolean).join('\n');
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.originAddress.trim() || !form.destinationAddress.trim()) {
+      setFormError('Informe a origem e o destino da corrida.');
+      return;
+    }
     if (!form.passengerConsent) {
       setFormError('Você precisa aceitar o termo de uso dos seus dados.');
       return;
     }
     setSubmitting(true);
     setFormError(null);
+
+    // Abre uma janela em branco ainda no gesto do usuário para evitar bloqueio de popup
+    const win = window.open('', '_blank');
+
     try {
-      await api.post(`/api/profile/${slug}/schedule`, {
-        ...form,
-        passengerCount: Number(form.passengerCount),
-        luggageCount: Number(form.luggageCount),
-      });
-      setSubmitted(true);
+      const [, waRes] = await Promise.all([
+        api.post(`/api/profile/${slug}/schedule`, {
+          ...form,
+          passengerCount: Number(form.passengerCount),
+          luggageCount: Number(form.luggageCount),
+        }),
+        api.get(`/api/profile/${slug}/whatsapp`, { params: { message: buildMsg() } }).catch(() => null),
+      ]);
 
-      // Avisa o taxista via WhatsApp — busca o número do perfil e abre direto
-      try {
-        const dateFormatted = form.scheduledDate
-          ? new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')
-          : form.scheduledDate;
-        const msg = [
-          `🚖 *Novo agendamento recebido!*`,
-          ``,
-          `👤 Cliente: ${form.passengerName}`,
-          `📱 WhatsApp: ${form.passengerWhatsapp}`,
-          ``,
-          `📍 Origem: ${form.originAddress}`,
-          `🏁 Destino: ${form.destinationAddress}`,
-          ``,
-          `📅 Data: ${dateFormatted}`,
-          `⏰ Horário: ${form.scheduledTime}`,
-          `👥 Passageiros: ${form.passengerCount}`,
-          form.luggageCount > 0 ? `🧳 Malas: ${form.luggageCount}` : null,
-          form.notes ? `📝 Obs: ${form.notes}` : null,
-          ``,
-          `Responda para confirmar ou recusar.`,
-        ].filter(Boolean).join('\n');
+      const link = waRes?.data?.data?.link ?? null;
+      setWhatsappLink(link);
 
-        const res = await api.get(`/api/profile/${slug}/whatsapp`, {
-          params: { message: msg },
-        });
-        const link = res.data.data?.link;
-        if (link) {
-          setWhatsappLink(link);
-        }
-      } catch {
-        // Falha silenciosa — agendamento já foi salvo
+      if (link && win) {
+        win.location.href = link;
+      } else if (win) {
+        win.close();
       }
+
+      setSubmitted(true);
     } catch (err: unknown) {
+      win?.close();
       const e2 = err as { response?: { data?: { error?: string } } };
       setFormError(e2?.response?.data?.error ?? 'Erro ao enviar. Tente novamente.');
     } finally {
@@ -220,13 +232,19 @@ export default function DriverPublicPage() {
             <input value={form.passengerWhatsapp} onChange={(e) => set('passengerWhatsapp', e.target.value)} required type="tel" maxLength={20} placeholder="11999999999" style={inp} />
           </FField>
 
-          <FField label="Origem *">
-            <input value={form.originAddress} onChange={(e) => set('originAddress', e.target.value)} required maxLength={200} placeholder="De onde você parte" style={inp} />
-          </FField>
+          <AddressInput
+            label="Origem *"
+            value={form.originAddress}
+            onChange={(v) => set('originAddress', v)}
+            placeholder="De onde você parte"
+          />
 
-          <FField label="Destino *">
-            <input value={form.destinationAddress} onChange={(e) => set('destinationAddress', e.target.value)} required maxLength={200} placeholder="Para onde vai" style={inp} />
-          </FField>
+          <AddressInput
+            label="Destino *"
+            value={form.destinationAddress}
+            onChange={(v) => set('destinationAddress', v)}
+            placeholder="Para onde vai"
+          />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <FField label="Data *">
@@ -284,7 +302,7 @@ export default function DriverPublicPage() {
           <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
           <div style={{ fontWeight: 900, fontSize: 16, color: '#14532D' }}>Pedido enviado!</div>
           <p style={{ fontSize: 13, color: '#14532D', fontWeight: 600, marginTop: 6, lineHeight: 1.5 }}>
-            Toque no botão abaixo para avisar {profile.displayName.split(' ')[0]} pelo WhatsApp e confirmar o agendamento.
+            O WhatsApp foi aberto para enviar os detalhes para {profile.displayName.split(' ')[0]}. Se não abriu automaticamente, toque no botão abaixo.
           </p>
           {whatsappLink && (
             <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
@@ -292,7 +310,7 @@ export default function DriverPublicPage() {
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <path d="M12 2a10 10 0 0 0-8.6 15.07L2 22l5.07-1.32A10 10 0 1 0 12 2Zm5.27 14.27c-.22.62-1.27 1.17-1.78 1.22-.46.05-1.05.07-1.69-.1a13 13 0 0 1-1.83-.68 11.36 11.36 0 0 1-4.32-3.83c-.34-.5-1.18-1.58-1.18-3.02 0-1.43.74-2.13 1-2.43.27-.3.58-.37.78-.37l.56.01c.18 0 .42-.07.66.5l.93 2.27c.08.16.13.34.02.55l-.32.5c-.1.16-.22.34-.05.65.17.3.75 1.22 1.61 1.97 1.1.96 2.04 1.27 2.36 1.42.32.15.5.13.69-.08.18-.2.79-.92.99-1.24.2-.32.4-.27.68-.16.27.1 1.74.82 2.04.97.3.15.5.22.57.34.07.13.07.75-.16 1.37Z"/>
               </svg>
-              Avisar {profile.displayName.split(' ')[0]} pelo WhatsApp
+              Abrir WhatsApp de {profile.displayName.split(' ')[0]}
             </a>
           )}
           <button type="button" onClick={() => { setSubmitted(false); setWhatsappLink(null); setForm(EMPTY_FORM); }}
