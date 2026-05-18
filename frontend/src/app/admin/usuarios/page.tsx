@@ -169,7 +169,7 @@ export default function UsuariosPage() {
                   <Td className="text-[12px] text-gray-500">{fmtDate(u.lastQuoteAt)}</Td>
                   <Td className="text-[12px] text-gray-500">{fmtDateShort(u.createdAt)}</Td>
                   <Td>
-                    <Btn size="sm" variant="ghost" onClick={(e) => { e?.stopPropagation?.(); setSelected(u); }}>
+                    <Btn size="sm" variant="ghost" onClick={() => setSelected(u)}>
                       Ver
                     </Btn>
                   </Td>
