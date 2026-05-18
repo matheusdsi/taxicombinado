@@ -121,7 +121,7 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
             <div style={{ fontSize: 34, fontWeight: 950, letterSpacing: '-0.04em', color: 'var(--ink)', marginTop: 2 }}>{formatCurrencyBRL(shownPrice)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
               <div style={{ background: 'rgba(17,24,39,.08)', borderRadius: 12, padding: 10 }}>
-                <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(17,24,39,.55)' }}>SOBRA PARA VOCE</div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(17,24,39,.55)' }}>ESTIMADO PARA VOCÊ</div>
                 <div style={{ fontSize: 17, fontWeight: 900, color: quote.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>{formatCurrencyBRL(quote.profit)}</div>
               </div>
               <div style={{ background: 'rgba(17,24,39,.08)', borderRadius: 12, padding: 10 }}>
@@ -134,7 +134,7 @@ function QuoteDetailModal({ quote, onClose }: { quote: HistoryQuote; onClose: ()
           <div className="tc-card" style={{ margin: 0 }}>
             <div className="tc-section-title">Como esse valor foi montado</div>
             <DetailLine label="Taximetro calculado" value={taximeter > 0 ? formatCurrencyBRL(taximeter) : 'Nao informado'} />
-            <DetailLine label="Ganho colocado em cima" value={gainOverTaximeter > 0 ? formatCurrencyBRL(gainOverTaximeter) : 'Sem acrescimo'} />
+            <DetailLine label="Pedágio, estacionamento e extra cobrado" value={gainOverTaximeter > 0 ? formatCurrencyBRL(gainOverTaximeter) : 'Sem acréscimo'} />
             <DetailLine label="Minimo para nao pagar pra trabalhar" value={quote.minimumPrice ? formatCurrencyBRL(quote.minimumPrice) : formatCurrencyBRL(quote.totalCost)} />
             {Number(quote.idealPrice) > 0 && <DetailLine label="Com folga melhor" value={formatCurrencyBRL(Number(quote.idealPrice))} />}
           </div>
@@ -286,7 +286,7 @@ export default function HistoricoPage() {
                       {formatCurrencyBRL(shownPrice)}
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: quote.profit >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 2 }}>
-                      {quote.profit >= 0 ? '+' : ''}{formatCurrencyBRL(quote.profit)} sobra
+                      {quote.profit >= 0 ? '+' : ''}{formatCurrencyBRL(quote.profit)} estimado
                     </div>
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export default function HistoricoPage() {
                   <span>Custo: {formatCurrencyBRL(quote.totalCost)}</span>
                   <span style={{ color: 'var(--gray-200)' }}>·</span>
                   <span style={{ fontWeight: 700, color: quote.margin >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {quote.margin.toFixed(1)}% lucro
+                    {quote.margin >= 0 ? 'Boa margem' : 'Margem negativa'}
                   </span>
                   {quote.isLocal && (
                     <>
@@ -330,7 +330,7 @@ export default function HistoricoPage() {
                     {quote.baseFare != null && <Pill tone="yellow">{quote.baseFare >= 9 ? 'Luxo' : 'Comum'}</Pill>}
                     {quote.flagMultiplier != null && <Pill>{quote.flagMultiplier >= 1.3 ? 'Bandeira 2' : 'Bandeira 1'}</Pill>}
                     {quote.tripType === 'round_trip' && Number(quote.estimatedMinutes) > 30 ? <Pill tone="yellow">Com espera</Pill> : null}
-                    {quote.profit < 0 ? <Pill tone="red">Deu prejuizo</Pill> : <Pill tone="green">Sobrou dinheiro</Pill>}
+                    {quote.profit < 0 ? <Pill tone="red">Deu prejuizo</Pill> : <Pill tone="green">Boa margem</Pill>}
                     {quote.isLocal && <Pill>Local</Pill>}
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--gray-400)', flexShrink: 0 }}>Ver detalhes</span>

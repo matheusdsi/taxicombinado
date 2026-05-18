@@ -59,15 +59,15 @@ export default function HomePage() {
       {!result && (
         <div className="mb-4">
           <Link
-            href="/minha-meta"
-            onClick={() => trackCtaClick('home_goal', { placement: 'home_top_card' })}
+            href="/meu-perfil"
+            onClick={() => trackCtaClick('home_public_profile', { placement: 'home_top_card' })}
             className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-gray-50 group"
           >
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-gray-900 text-sm font-black text-taxi-500">R$</span>
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-gray-900 text-sm font-black text-taxi-500">🔗</span>
               <div>
-                <p className="text-sm font-extrabold text-gray-900">Você sabe quanto precisa fazer por dia?</p>
-                <p className="text-xs font-semibold text-gray-500">Cadastre seus custos e veja sua meta mínima diária.</p>
+                <p className="text-sm font-extrabold text-gray-900">Compartilhe seu perfil com passageiros</p>
+                <p className="text-xs font-semibold text-gray-500">Crie seu link e envie pelo WhatsApp para seus clientes.</p>
               </div>
             </div>
             <span className="text-lg text-gray-400 transition-transform group-hover:translate-x-0.5">→</span>

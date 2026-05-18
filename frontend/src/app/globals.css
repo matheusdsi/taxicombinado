@@ -47,6 +47,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Normalize date/time inputs on iOS */
+input[type=date],
+input[type=time] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-height: 42px;
+}
+
 /* Remove number input arrows */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {

@@ -137,10 +137,26 @@ export default function MeuPerfilPage() {
           Seu perfil gera um link para passageiros te encontrarem e agendarem.
         </div>
         {profileUrl && (
-          <a href={profileUrl} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--green)', textDecoration: 'none', background: 'var(--green-soft)', padding: '6px 12px', borderRadius: 8 }}>
-            Ver meu perfil público →
-          </a>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <a href={profileUrl} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: 'var(--green)', textDecoration: 'none', background: 'var(--green-soft)', padding: '6px 12px', borderRadius: 8 }}>
+              Ver meu perfil público →
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                const fullUrl = `${window.location.origin}${profileUrl}`;
+                const msg = `Olá! Sou motorista de táxi e você pode agendar uma corrida comigo pelo meu perfil: ${fullUrl}`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#fff', background: '#25D366', border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <path d="M12 2a10 10 0 0 0-8.6 15.07L2 22l5.07-1.32A10 10 0 1 0 12 2Zm5.27 14.27c-.22.62-1.27 1.17-1.78 1.22-.46.05-1.05.07-1.69-.1a13 13 0 0 1-1.83-.68 11.36 11.36 0 0 1-4.32-3.83c-.34-.5-1.18-1.58-1.18-3.02 0-1.43.74-2.13 1-2.43.27-.3.58-.37.78-.37l.56.01c.18 0 .42-.07.66.5l.93 2.27c.08.16.13.34.02.55l-.32.5c-.1.16-.22.34-.05.65.17.3.75 1.22 1.61 1.97 1.1.96 2.04 1.27 2.36 1.42.32.15.5.13.69-.08.18-.2.79-.92.99-1.24.2-.32.4-.27.68-.16.27.1 1.74.82 2.04.97.3.15.5.22.57.34.07.13.07.75-.16 1.37Z"/>
+              </svg>
+              Enviar pelo WhatsApp
+            </button>
+          </div>
         )}
       </div>
 

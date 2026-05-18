@@ -64,6 +64,7 @@ export default function DriverPublicPage() {
   const [form, setForm] = useState<ScheduleForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [whatsappLink, setWhatsappLink] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,7 +95,7 @@ export default function DriverPublicPage() {
       });
       setSubmitted(true);
 
-      // Avisa o taxista via WhatsApp automaticamente
+      // Avisa o taxista via WhatsApp — busca o número do perfil e abre direto
       try {
         const dateFormatted = form.scheduledDate
           ? new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('pt-BR')
@@ -120,8 +121,9 @@ export default function DriverPublicPage() {
         const res = await api.get(`/api/profile/${slug}/whatsapp`, {
           params: { message: msg },
         });
-        if (res.data.data?.link) {
-          window.open(res.data.data.link, '_blank');
+        const link = res.data.data?.link;
+        if (link) {
+          setWhatsappLink(link);
         }
       } catch {
         // Falha silenciosa — agendamento já foi salvo
@@ -282,10 +284,19 @@ export default function DriverPublicPage() {
           <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
           <div style={{ fontWeight: 900, fontSize: 16, color: '#14532D' }}>Pedido enviado!</div>
           <p style={{ fontSize: 13, color: '#14532D', fontWeight: 600, marginTop: 6, lineHeight: 1.5 }}>
-            {profile.displayName.split(' ')[0]} receberá sua solicitação e entrará em contato via WhatsApp para confirmar.
+            Toque no botão abaixo para avisar {profile.displayName.split(' ')[0]} pelo WhatsApp e confirmar o agendamento.
           </p>
-          <button type="button" onClick={() => { setSubmitted(false); setForm(EMPTY_FORM); }}
-            style={{ marginTop: 14, background: 'var(--green)', color: '#fff', border: 0, borderRadius: 12, padding: '10px 20px', fontFamily: 'inherit', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+          {whatsappLink && (
+            <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14, background: '#25D366', color: '#fff', borderRadius: 12, padding: '12px 20px', fontFamily: 'inherit', fontWeight: 800, fontSize: 14, textDecoration: 'none' }}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M12 2a10 10 0 0 0-8.6 15.07L2 22l5.07-1.32A10 10 0 1 0 12 2Zm5.27 14.27c-.22.62-1.27 1.17-1.78 1.22-.46.05-1.05.07-1.69-.1a13 13 0 0 1-1.83-.68 11.36 11.36 0 0 1-4.32-3.83c-.34-.5-1.18-1.58-1.18-3.02 0-1.43.74-2.13 1-2.43.27-.3.58-.37.78-.37l.56.01c.18 0 .42-.07.66.5l.93 2.27c.08.16.13.34.02.55l-.32.5c-.1.16-.22.34-.05.65.17.3.75 1.22 1.61 1.97 1.1.96 2.04 1.27 2.36 1.42.32.15.5.13.69-.08.18-.2.79-.92.99-1.24.2-.32.4-.27.68-.16.27.1 1.74.82 2.04.97.3.15.5.22.57.34.07.13.07.75-.16 1.37Z"/>
+              </svg>
+              Avisar {profile.displayName.split(' ')[0]} pelo WhatsApp
+            </a>
+          )}
+          <button type="button" onClick={() => { setSubmitted(false); setWhatsappLink(null); setForm(EMPTY_FORM); }}
+            style={{ display: 'block', margin: '12px auto 0', background: 'transparent', color: '#14532D', border: 0, fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
             Fazer outra solicitação
           </button>
         </div>
@@ -319,4 +330,6 @@ const inp: React.CSSProperties = {
   background: 'var(--surface)',
   outline: 'none',
   boxSizing: 'border-box',
+  WebkitAppearance: 'none',
+  appearance: 'none',
 };

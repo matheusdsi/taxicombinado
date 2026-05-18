@@ -294,7 +294,7 @@ export function QuoteResultCard({ result, quoteId, originAddress, destinationAdd
               {gainOverTaximeter > 0 && (
                 <div style={{ marginTop: 4, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>
-                    Incluindo ganho adicional de {formatCurrencyBRL(gainOverTaximeter)} sobre o taxímetro.
+                    Incluindo pedágio, estacionamento e extra cobrado: {formatCurrencyBRL(gainOverTaximeter)}.
                   </div>
                 </div>
               )}

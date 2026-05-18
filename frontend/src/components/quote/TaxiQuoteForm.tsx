@@ -613,15 +613,15 @@ export function TaxiQuoteForm({ onResult }: TaxiQuoteFormProps) {
               style={{ width: 18, height: 18, accentColor: 'var(--ink)', flexShrink: 0 }}
             />
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>Adicionar ganho extra acima do taxímetro</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>Marque para incluir uma porcentagem de ganho além do taxímetro.</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>Cobrar valor extra além do taxímetro</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--gray-500)' }}>Marque para incluir uma porcentagem de ganho extra além do valor do taxímetro.</span>
             </span>
           </label>
 
           {hasExtraGain && (
             <>
               <Controller name="desiredMarginPercent" control={control} render={({ field }) => (
-                <NumberInput label="Ganho acima do taxímetro (%)" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
+                <NumberInput label="Valor extra acima do taxímetro (%)" value={field.value} onChange={field.onChange} suffix="%" step={5} min={0} max={80} />
               )} />
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4 }}>

@@ -92,21 +92,22 @@ export function Header() {
               trackEvent('header_menu_toggle', { open: !open });
             }}
             aria-label={open ? 'Fechar menu' : 'Abrir menu'}
-            className="flex flex-col items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors gap-1.5 shrink-0"
+            className="flex flex-col items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
+            style={{ gap: 6 }}
           >
-              <span
-                className="block h-0.5 bg-gray-700 transition-all duration-200 origin-center"
-                style={{ width: 20, transform: open ? 'translateY(4px) rotate(45deg)' : 'none' }}
-              />
-              <span
-                className="block h-0.5 bg-gray-700 transition-all duration-200"
-                style={{ width: 20, opacity: open ? 0 : 1 }}
-              />
-              <span
-                className="block h-0.5 bg-gray-700 transition-all duration-200 origin-center"
-                style={{ width: 20, transform: open ? 'translateY(-4px) rotate(-45deg)' : 'none' }}
-              />
-            </button>
+            <span
+              className="block h-0.5 bg-gray-700 transition-all duration-200 origin-center"
+              style={{ width: 20, transform: open ? 'translateY(7px) rotate(45deg)' : 'none' }}
+            />
+            <span
+              className="block h-0.5 bg-gray-700 transition-all duration-200"
+              style={{ width: 20, opacity: open ? 0 : 1, transform: open ? 'scaleX(0)' : 'none' }}
+            />
+            <span
+              className="block h-0.5 bg-gray-700 transition-all duration-200 origin-center"
+              style={{ width: 20, transform: open ? 'translateY(-7px) rotate(-45deg)' : 'none' }}
+            />
+          </button>
 
           <Link href="/" onClick={() => trackCtaClick('header_logo', { placement: 'header' })} className="flex items-center gap-2 flex-1">
             <Image
