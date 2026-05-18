@@ -109,6 +109,10 @@ input[type=range]::-moz-range-thumb {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Scrollbar hide utility */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* TC design system helpers */
 .tc-input {
   font-family: 'Manrope', sans-serif;
