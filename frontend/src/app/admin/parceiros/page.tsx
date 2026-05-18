@@ -300,7 +300,7 @@ export default function ParceirosPage() {
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
                 <input
                   type="text"
-                  value={(form as Record<string, string>)[key] ?? ''}
+                  value={(form as unknown as Record<string, string>)[key] ?? ''}
                   required={required}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                   className="rounded-xl border border-gray-200 px-3 py-2 text-[13px] outline-none focus:border-[#F5B800] transition-all"
