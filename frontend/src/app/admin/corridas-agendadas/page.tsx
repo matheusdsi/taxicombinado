@@ -8,6 +8,17 @@ import {
   fmtDate, money, num,
 } from '../_components';
 
+function fmtBR(dateStr: string | null | undefined) {
+  if (!dateStr) return '—';
+  // scheduledDate comes as "YYYY-MM-DD", parse without timezone conversion
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  // fallback for ISO datetime strings
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
 interface RideRequest {
   id: string;
   passengerName: string;
@@ -140,7 +151,8 @@ export default function CorridasAgendadasPage() {
             <thead>
               <tr>
                 <Th>Passageiro</Th>
-                <Th>Data / Hora</Th>
+                <Th>Data / Hora corrida</Th>
+                <Th>Agendado em</Th>
                 <Th>Rota</Th>
                 <Th>Estimativa</Th>
                 <Th>Info</Th>
@@ -164,9 +176,10 @@ export default function CorridasAgendadasPage() {
                     </a>
                   </Td>
                   <Td>
-                    <p className="text-[13px] font-semibold text-[#0F1623]">{r.scheduledDate}</p>
+                    <p className="text-[13px] font-semibold text-[#0F1623]">{fmtBR(r.scheduledDate)}</p>
                     <p className="text-[12px] text-gray-500">{r.scheduledTime}</p>
                   </Td>
+                  <Td className="text-[12px] text-gray-500 whitespace-nowrap">{fmtBR(r.createdAt)}</Td>
                   <Td>
                     <p className="text-[12px] text-gray-700 truncate max-w-[180px]">{r.originAddress}</p>
                     <p className="text-[11px] text-gray-400 truncate max-w-[180px]">→ {r.destinationAddress}</p>
@@ -231,7 +244,7 @@ export default function CorridasAgendadasPage() {
               </div>
               <div>
                 <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Corrida</h4>
-                <StatRow label="Data" value={<span className="font-semibold">{selected.scheduledDate}</span>} />
+                <StatRow label="Data" value={<span className="font-semibold">{fmtBR(selected.scheduledDate)}</span>} />
                 <StatRow label="Hora" value={<span className="font-semibold">{selected.scheduledTime}</span>} />
                 <StatRow label="Origem" value={<span className="text-[12px]">{selected.originAddress}</span>} />
                 <StatRow label="Destino" value={<span className="text-[12px]">{selected.destinationAddress}</span>} />
@@ -258,7 +271,7 @@ export default function CorridasAgendadasPage() {
                   <span className="text-[12px] text-gray-500">Status atual:</span>
                   <RideStatusBadge status={selected.status} />
                 </div>
-                <span className="text-[11px] text-gray-400">Solicitado em {fmtDate(selected.createdAt)}</span>
+                <span className="text-[11px] text-gray-400">Solicitado em {fmtBR(selected.createdAt)}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {selected.status !== 'confirmed' && (
