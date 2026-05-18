@@ -716,58 +716,97 @@ router.post('/users/:id/reset-password', async (req: Request, res: Response) => 
 });
 
 // ─── GET /api/admin/ride-requests ─────────────────────────────
+// Unifies RideRequest (/agendar) + SchedulingRequest (/motorista/[slug]) into one list.
+// Status normalisation: SchedulingRequest uses PT (pendente/aceito/realizado/cancelado)
+// → mapped to EN equivalents (new/confirmed/completed/cancelled) for a consistent UI.
 router.get('/ride-requests', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10));
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10)));
-    const status = req.query.status ? String(req.query.status) : undefined;
+    const statusFilter = req.query.status ? String(req.query.status) : undefined;
 
-    const where: Record<string, unknown> = {};
-    if (status && status !== 'all') where.status = status;
+    // Map EN status filter → PT equivalents for SchedulingRequest
+    const ptStatus: Record<string, string> = {
+      new: 'pendente', confirmed: 'aceito', completed: 'realizado', cancelled: 'cancelado',
+    };
 
-    const [total, rides] = await Promise.all([
-      prisma.rideRequest.count({ where }),
+    const rrWhere: Record<string, unknown> = {};
+    const srWhere: Record<string, unknown> = {};
+    if (statusFilter && statusFilter !== 'all') {
+      rrWhere.status = statusFilter;
+      srWhere.status = ptStatus[statusFilter] ?? statusFilter;
+    }
+
+    const [rrAll, srAll, rrAgg, srAgg] = await Promise.all([
       prisma.rideRequest.findMany({
-        where,
+        where: rrWhere,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
         select: {
-          id: true,
-          passengerName: true,
-          passengerPhone: true,
-          originAddress: true,
-          destinationAddress: true,
-          scheduledDate: true,
-          scheduledTime: true,
-          passengerCount: true,
-          needsLargeVehicle: true,
-          needsAccessibility: true,
-          hasLuggage: true,
-          notes: true,
-          estimatedPriceMin: true,
-          estimatedPriceMax: true,
-          estimatedDistanceKm: true,
-          status: true,
-          createdAt: true,
+          id: true, passengerName: true, passengerPhone: true,
+          originAddress: true, destinationAddress: true,
+          scheduledDate: true, scheduledTime: true,
+          passengerCount: true, needsLargeVehicle: true,
+          needsAccessibility: true, hasLuggage: true,
+          notes: true, estimatedPriceMin: true, estimatedPriceMax: true,
+          estimatedDistanceKm: true, status: true, createdAt: true,
         },
       }),
+      prisma.schedulingRequest.findMany({
+        where: srWhere,
+        orderBy: { createdAt: 'desc' },
+        include: { driverProfile: { select: { slug: true, displayName: true } } },
+      }),
+      prisma.rideRequest.aggregate({ _sum: { estimatedPriceMin: true, estimatedPriceMax: true } }),
+      prisma.schedulingRequest.aggregate({ _sum: { estimatedPriceMin: true, estimatedPriceMax: true } }),
     ]);
 
-    const stats = await prisma.rideRequest.groupBy({
-      by: ['status'],
-      _count: { _all: true },
+    // Normalise SchedulingRequest → common shape
+    const srNormalised = srAll.map((r) => {
+      const statusMap: Record<string, string> = {
+        pendente: 'new', aceito: 'confirmed', realizado: 'completed', cancelado: 'cancelled',
+      };
+      return {
+        id: r.id,
+        source: 'scheduling' as const,
+        passengerName: r.passengerName,
+        passengerPhone: r.passengerWhatsapp,
+        originAddress: r.originAddress,
+        destinationAddress: r.destinationAddress,
+        scheduledDate: r.scheduledDate,
+        scheduledTime: r.scheduledTime,
+        passengerCount: r.passengerCount,
+        needsLargeVehicle: false,
+        needsAccessibility: false,
+        hasLuggage: r.luggageCount > 0,
+        notes: r.notes ?? null,
+        estimatedPriceMin: r.estimatedPriceMin ?? null,
+        estimatedPriceMax: r.estimatedPriceMax ?? null,
+        estimatedDistanceKm: r.estimatedDistanceKm ?? null,
+        status: statusMap[r.status] ?? r.status,
+        statusOriginal: r.status,
+        driverSlug: r.driverProfile?.slug ?? null,
+        driverName: r.driverProfile?.displayName ?? null,
+        createdAt: r.createdAt,
+      };
     });
 
-    const byStatus = stats.reduce<Record<string, number>>((acc, s) => {
-      acc[s.status] = s._count._all;
-      return acc;
-    }, {});
+    const rrNormalised = rrAll.map((r) => ({ ...r, source: 'public' as const, driverSlug: null, driverName: null, statusOriginal: r.status }));
 
-    const valueAgg = await prisma.rideRequest.aggregate({
-      _avg: { estimatedPriceMin: true, estimatedPriceMax: true },
-      _sum: { estimatedPriceMin: true, estimatedPriceMax: true },
-    });
+    // Merge and sort by createdAt desc, then paginate
+    const allRides = [...rrNormalised, ...srNormalised]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = allRides.length;
+    const rides = allRides.slice((page - 1) * limit, page * limit);
+
+    // Count by normalised status across both tables
+    const byStatus: Record<string, number> = {};
+    for (const r of allRides) {
+      byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+    }
+
+    const sumPriceMin = round2((rrAgg._sum.estimatedPriceMin ?? 0) + (srAgg._sum.estimatedPriceMin ?? 0));
+    const sumPriceMax = round2((rrAgg._sum.estimatedPriceMax ?? 0) + (srAgg._sum.estimatedPriceMax ?? 0));
 
     return res.json({
       success: true,
@@ -776,10 +815,10 @@ router.get('/ride-requests', async (req: Request, res: Response) => {
         total,
         totalPages: Math.ceil(total / limit),
         byStatus,
-        avgPriceMin: round2(valueAgg._avg.estimatedPriceMin),
-        avgPriceMax: round2(valueAgg._avg.estimatedPriceMax),
-        sumPriceMin: round2(valueAgg._sum.estimatedPriceMin),
-        sumPriceMax: round2(valueAgg._sum.estimatedPriceMax),
+        sumPriceMin,
+        sumPriceMax,
+        avgPriceMin: total > 0 && sumPriceMin != null ? round2(sumPriceMin / total) : null,
+        avgPriceMax: total > 0 && sumPriceMax != null ? round2(sumPriceMax / total) : null,
       },
     });
   } catch (error) {
@@ -789,6 +828,7 @@ router.get('/ride-requests', async (req: Request, res: Response) => {
 });
 
 // ─── PATCH /api/admin/ride-requests/:id ───────────────────────
+// Works for both RideRequest (EN status) and SchedulingRequest (PT status).
 router.patch('/ride-requests/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -797,11 +837,25 @@ router.patch('/ride-requests/:id', async (req: Request, res: Response) => {
     if (!status || !allowed.includes(status)) {
       return res.status(400).json({ success: false, error: 'Status inválido' });
     }
-    const ride = await prisma.rideRequest.update({
-      where: { id },
-      data: { status },
-    });
-    return res.json({ success: true, data: ride });
+
+    // Try RideRequest first (EN status)
+    const rr = await prisma.rideRequest.findUnique({ where: { id } });
+    if (rr) {
+      const updated = await prisma.rideRequest.update({ where: { id }, data: { status } });
+      return res.json({ success: true, data: updated });
+    }
+
+    // Fall back to SchedulingRequest (map EN → PT)
+    const ptStatus: Record<string, string> = {
+      new: 'pendente', confirmed: 'aceito', completed: 'realizado', cancelled: 'cancelado',
+    };
+    const sr = await prisma.schedulingRequest.findUnique({ where: { id } });
+    if (sr) {
+      const updated = await prisma.schedulingRequest.update({ where: { id }, data: { status: ptStatus[status] } });
+      return res.json({ success: true, data: updated });
+    }
+
+    return res.status(404).json({ success: false, error: 'Agendamento não encontrado' });
   } catch (error) {
     console.error('Admin ride-request update error:', error);
     return res.status(500).json({ success: false, error: 'Erro ao atualizar agendamento' });

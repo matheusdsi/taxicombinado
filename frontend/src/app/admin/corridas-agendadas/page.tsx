@@ -21,6 +21,7 @@ function fmtBR(dateStr: string | null | undefined) {
 
 interface RideRequest {
   id: string;
+  source?: 'public' | 'scheduling';
   passengerName: string;
   passengerPhone: string;
   originAddress: string;
@@ -36,6 +37,8 @@ interface RideRequest {
   estimatedPriceMax?: number | null;
   estimatedDistanceKm?: number | null;
   status: string;
+  driverSlug?: string | null;
+  driverName?: string | null;
   createdAt: string;
 }
 
@@ -174,6 +177,12 @@ export default function CorridasAgendadasPage() {
                     >
                       {r.passengerPhone}
                     </a>
+                    {r.source === 'scheduling' && r.driverName && (
+                      <p className="text-[10px] text-blue-500 mt-0.5">Taxista: {r.driverName}</p>
+                    )}
+                    <span className={`inline-block mt-0.5 text-[9px] font-semibold rounded px-1.5 py-0.5 ${r.source === 'scheduling' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {r.source === 'scheduling' ? 'Perfil público' : 'Formulário /agendar'}
+                    </span>
                   </Td>
                   <Td>
                     <p className="text-[13px] font-semibold text-[#0F1623]">{fmtBR(r.scheduledDate)}</p>
@@ -241,6 +250,12 @@ export default function CorridasAgendadasPage() {
                 <StatRow label="Van/7 lugares" value={selected.needsLargeVehicle ? 'Sim' : 'Não'} />
                 <StatRow label="Bagagem" value={selected.hasLuggage ? 'Sim' : 'Não'} />
                 <StatRow label="Acessibilidade" value={selected.needsAccessibility ? 'Sim' : 'Não'} />
+                {selected.driverName && <StatRow label="Taxista" value={selected.driverName} />}
+                <StatRow label="Origem" value={
+                  <span className={`text-[10px] font-semibold rounded px-1.5 py-0.5 ${selected.source === 'scheduling' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                    {selected.source === 'scheduling' ? 'Perfil público do taxista' : 'Formulário /agendar'}
+                  </span>
+                } />
               </div>
               <div>
                 <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Corrida</h4>
