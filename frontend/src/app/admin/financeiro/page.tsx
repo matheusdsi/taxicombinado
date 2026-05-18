@@ -15,7 +15,7 @@ interface AdminStats {
   timeSeries: {
     avgPricePerDay: { day: string; avg_price: number; avg_cost: number; avg_profit: number }[];
   };
-  overview: { totalQuotes: number; totalPartners: number };
+  overview: { totalQuotes: number; totalPartners: number; quotesLast30?: number };
 }
 
 interface RideRequestStats {
@@ -59,13 +59,7 @@ export default function FinanceiroPage() {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  const faturamento = stats
-    ? (stats.quoteAverages.recommendedPrice ?? 0) * (stats.overview.totalQuotes ?? 0)
-    : null;
-  const custoTotal = stats
-    ? (stats.quoteAverages.totalCost ?? 0) * (stats.overview.totalQuotes ?? 0)
-    : null;
-  const sobraTotal = faturamento && custoTotal ? faturamento - custoTotal : null;
+  const last30days = stats?.timeSeries.avgPricePerDay ?? [];
 
   const priceData = stats?.timeSeries.avgPricePerDay.slice(-14).map((d) => d.avg_price) ?? [];
   const profitData = stats?.timeSeries.avgPricePerDay.slice(-14).map((d) => d.avg_profit) ?? [];
@@ -119,26 +113,29 @@ export default function FinanceiroPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <KpiCard
-              label="Faturamento estimado"
-              value={money(faturamento)}
+              label="Ticket médio (cotações)"
+              value={money(stats?.quoteAverages.recommendedPrice)}
               color="yellow"
+              sub={`Margem: ${stats?.quoteAverages.margin?.toFixed(0) ?? '—'}%`}
               icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
             />
             <KpiCard
-              label="Custo estimado"
-              value={money(custoTotal)}
+              label="Custo médio (cotações)"
+              value={money(stats?.quoteAverages.totalCost)}
               color="red"
+              sub="Custo médio por cotação"
             />
             <KpiCard
-              label="Sobra total estimada"
-              value={money(sobraTotal)}
+              label="Sobra média (cotações)"
+              value={money(stats?.quoteAverages.profit)}
               color="green"
+              sub="Sobra média por cotação"
             />
             <KpiCard
-              label="Ticket médio"
-              value={money(stats?.quoteAverages.recommendedPrice)}
+              label="Total cotações (30 dias)"
+              value={num(stats?.overview.quotesLast30 ?? 0)}
               color="blue"
-              sub={`Margem: ${stats?.quoteAverages.margin?.toFixed(0) ?? '—'}%`}
+              sub={`Últimas ${last30days.length} dias c/ dados`}
             />
           </div>
 
