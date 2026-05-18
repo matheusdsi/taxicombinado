@@ -35,6 +35,8 @@ const navItems = [
 export function BottomNavigation() {
   const pathname = usePathname();
 
+  if (pathname.startsWith('/admin')) return null;
+
   return (
     <nav style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,

@@ -63,6 +63,8 @@ export function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  if (pathname.startsWith('/admin')) return null;
+
   useEffect(() => {
     setOpen(false);
   }, [pathname]);

@@ -6,6 +6,7 @@ import { LegalFooter } from '@/components/layout/LegalFooter';
 import { ConsentBanner } from '@/components/ui/ConsentBanner';
 import { AuthProvider } from '@/context/AuthContext';
 import { PWAInstallPrompt } from '@/components/pwa/PWAInstallPrompt';
+import { ConditionalShell } from '@/components/layout/ConditionalShell';
 
 export const metadata: Metadata = {
   title: 'Táxi Combinado - Calculadora de Corrida para Taxistas',
@@ -79,8 +80,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-W8L7JP8M" height="0" width="0" style={{ display: 'none', visibility: 'hidden' }}></iframe></noscript>
         <AuthProvider>
           <Header />
-          <div className="min-h-[calc(100vh-56px)]">{children}</div>
-          <LegalFooter />
+          <ConditionalShell footer={<LegalFooter />}>
+            {children}
+          </ConditionalShell>
           <BottomNavigation />
           <ConsentBanner />
           <PWAInstallPrompt />
