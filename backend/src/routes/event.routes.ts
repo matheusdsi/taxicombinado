@@ -17,15 +17,19 @@ router.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'Evento inválido' });
   }
 
-  await prisma.appEvent.create({
-    data: {
-      anonymousId: req.anonymousId ?? null,
-      eventType,
-      platform: platform ?? null,
-      metadata: metadata ?? undefined,
-      userAgent: req.headers['user-agent'] ?? null,
-    },
-  });
+  try {
+    await prisma.appEvent.create({
+      data: {
+        anonymousId: req.anonymousId ?? null,
+        eventType,
+        platform: platform ?? null,
+        metadata: metadata ?? undefined,
+        userAgent: req.headers['user-agent'] ?? null,
+      },
+    });
+  } catch (error) {
+    console.warn('App event ignored:', error);
+  }
 
   return res.json({ success: true });
 });
