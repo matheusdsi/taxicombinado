@@ -125,6 +125,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
         tollTotal: true,
         desiredMarginPercent: true,
       },
+      _sum: { recommendedPrice: true },
       _min: { recommendedPrice: true, totalCost: true, createdAt: true },
       _max: { recommendedPrice: true, totalCost: true },
     });
@@ -354,6 +355,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
           desiredMarginPercent: round2(quoteAggregates._avg.desiredMarginPercent),
           minRecommendedPrice: round2(quoteAggregates._min.recommendedPrice),
           maxRecommendedPrice: round2(quoteAggregates._max.recommendedPrice),
+          sumRecommendedPrice: round2(quoteAggregates._sum.recommendedPrice),
         },
         breakdowns: {
           tripType: tripTypeBreakdown,

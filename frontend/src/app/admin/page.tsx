@@ -21,7 +21,7 @@ interface AdminStats {
   quoteAverages: {
     distanceKm: number | null; recommendedPrice: number | null;
     totalCost: number | null; profit: number | null; margin: number | null;
-    pricePerKm: number | null;
+    pricePerKm: number | null; sumRecommendedPrice: number | null;
   };
   timeSeries: {
     quotesPerDay: { day: string; count: number }[];
@@ -414,17 +414,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* Métricas rápidas */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
+          { label: 'Total cotado', value: money(quoteAverages.sumRecommendedPrice), highlight: true },
           { label: 'Taxímetro médio', value: money(quoteAverages.recommendedPrice) },
           { label: 'Distância média', value: quoteAverages.distanceKm ? `${quoteAverages.distanceKm.toFixed(1)} km` : '—' },
           { label: 'Ticket médio taxistas', value: money(quoteAverages.recommendedPrice) },
           { label: 'Lucro médio taxistas', value: money(quoteAverages.profit) },
           { label: 'Margem média', value: quoteAverages.margin ? `${quoteAverages.margin.toFixed(0)}%` : '—' },
         ].map((m) => (
-          <div key={m.label} className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4">
-            <p className="text-[11px] text-gray-400 mb-1.5">{m.label}</p>
-            <p className="text-[18px] font-bold text-[#0F1623]">{m.value}</p>
+          <div key={m.label} className={`rounded-2xl border shadow-sm p-4 ${'highlight' in m && m.highlight ? 'bg-[#FFF8DC] border-[#F5B800]/40' : 'bg-white border-gray-100'}`}>
+            <p className="text-[11px] text-gray-500 mb-1.5">{m.label}</p>
+            <p className={`text-[18px] font-bold ${'highlight' in m && m.highlight ? 'text-[#C89000]' : 'text-[#0F1623]'}`}>{m.value}</p>
             <p className="mt-1 text-[11px] text-emerald-600 font-medium flex items-center gap-1">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="18 15 12 9 6 15"/></svg>
               dados reais
