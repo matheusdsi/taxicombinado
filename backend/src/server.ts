@@ -12,6 +12,7 @@ import placesRoutes from './routes/places.routes';
 import accountRoutes from './routes/account.routes';
 import rideRequestRoutes from './routes/ride-requests.routes';
 import profileRoutes from './routes/profile.routes';
+import eventRoutes from './routes/event.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -96,6 +97,9 @@ app.use('/api/ride-requests', rideRequestRoutes);
 
 // Driver public profiles + scheduling
 app.use('/api/profile', profileRoutes);
+
+// App events (PWA install, etc.)
+app.use('/api/app-event', eventRoutes);
 
 // Standalone endpoints that map to partner router handlers
 app.use('/api/partner-leads', (req, _res, next) => {

@@ -382,6 +382,18 @@ model AppFeedback {
   @@map("app_feedback")
 }
 
+model AppEvent {
+  id          String   @id @default(uuid())
+  anonymousId String?  @map("anonymous_id")
+  eventType   String   @map("event_type")
+  platform    String?
+  metadata    Json?
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("app_events")
+}
+
 model RideRequest {
   id                 String   @id @default(uuid())
   passengerName      String   @map("passenger_name")

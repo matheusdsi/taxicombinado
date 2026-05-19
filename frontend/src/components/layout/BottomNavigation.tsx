@@ -4,6 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/lib/analytics';
+import { apiUrl } from '@/lib/apiConfig';
+
+function logPwaEvent(eventType: string, platform?: string, metadata?: Record<string, string>) {
+  fetch(apiUrl('/api/app-event'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ eventType, platform, metadata }),
+  }).catch(() => undefined);
+}
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -35,21 +45,50 @@ const navItems = [
 
 const INSTALL_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 10v5"/><path d="M9 13l3 3 3-3"/></svg>`;
 
+function IosStep({ n, title, sub, shareIcon, last }: {
+  n: number; title: string; sub?: string; shareIcon?: boolean; last?: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 14, marginBottom: last ? 0 : 18 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: '50%', background: '#f5b800',
+        color: '#111', fontWeight: 800, fontSize: 14,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>{n}</div>
+      <div>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{title}</p>
+        {sub && <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>{sub}</p>}
+        {shareIcon && (
+          <svg style={{ marginTop: 6 }} viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+            <polyline points="16 6 12 2 8 6"/>
+            <line x1="12" y1="2" x2="12" y2="15"/>
+          </svg>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function BottomNavigation() {
   const pathname = usePathname();
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIos, setIsIos] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [showIosModal, setShowIosModal] = useState(false);
+  const [iosBrowser, setIosBrowser] = useState<'safari' | 'chrome'>('safari');
 
   useEffect(() => {
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    const ios = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+    const ua = window.navigator.userAgent;
+    const ios = /iphone|ipad|ipod/i.test(ua);
+    const iosChrome = /crios/i.test(ua);
 
     setIsStandalone(standalone);
     setIsIos(ios);
+    if (ios) setIosBrowser(iosChrome ? 'chrome' : 'safari');
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -74,24 +113,29 @@ export function BottomNavigation() {
 
   const handleInstallClick = async () => {
     if (isStandalone) return;
-    trackEvent('pwa_install_click', { platform: isIos ? 'ios' : 'android' });
+    const platform = isIos ? 'ios' : 'android';
+    trackEvent('pwa_install_click', { platform });
+    logPwaEvent('pwa_install_click', platform);
     if (installPrompt) {
       try {
         await installPrompt.prompt();
         const { outcome } = await installPrompt.userChoice;
         trackEvent('pwa_install_android_outcome', { outcome });
+        logPwaEvent('pwa_install_android_outcome', platform, { outcome });
         if (outcome === 'accepted') setInstallPrompt(null);
       } catch {
         // prompt already used or browser blocked
       }
     } else if (isIos) {
       trackEvent('pwa_install_ios_modal_open');
+      logPwaEvent('pwa_install_ios_modal_open', platform);
       setShowIosModal(true);
     }
   };
 
   const handleIosModalClose = () => {
     trackEvent('pwa_install_ios_modal_close');
+    logPwaEvent('pwa_install_ios_modal_close', 'ios');
     setShowIosModal(false);
   };
 
@@ -147,7 +191,7 @@ export function BottomNavigation() {
               dangerouslySetInnerHTML={{ __html: INSTALL_ICON }}
             />
             <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1, color: isStandalone ? 'var(--gray-300)' : 'var(--gray-500)' }}>
-              {isStandalone ? 'Instalado' : 'Instalar'}
+              {isStandalone ? 'Instalado' : 'Instalar app'}
             </span>
           </button>
         </div>
@@ -165,7 +209,8 @@ export function BottomNavigation() {
             padding: '24px 20px',
             paddingBottom: 'max(32px, env(safe-area-inset-bottom, 32px))',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <p style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Adicionar à Tela de Início</p>
               <button
                 type="button"
@@ -175,34 +220,44 @@ export function BottomNavigation() {
               >×</button>
             </div>
 
-            <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f5b800', color: '#111', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>1</div>
-              <div>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Toque em Compartilhar</p>
-                <p style={{ margin: '2px 0 6px', fontSize: 13, color: '#6b7280' }}>Ícone na barra inferior do Safari</p>
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                  <polyline points="16 6 12 2 8 6"/>
-                  <line x1="12" y1="2" x2="12" y2="15"/>
-                </svg>
-              </div>
+            {/* Browser toggle */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 24, background: '#f3f4f6', borderRadius: 12, padding: 4 }}>
+              {(['safari', 'chrome'] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setIosBrowser(b)}
+                  style={{
+                    flex: 1, padding: '7px 0', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    background: iosBrowser === b ? 'white' : 'transparent',
+                    color: iosBrowser === b ? '#0f1623' : '#6b7280',
+                    boxShadow: iosBrowser === b ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {b === 'safari' ? 'Safari' : 'Chrome'}
+                </button>
+              ))}
             </div>
 
-            <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f5b800', color: '#111', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>2</div>
-              <div>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Toque em <strong>"Adicionar à Tela de Início"</strong></p>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>Role o menu para encontrar a opção</p>
-              </div>
-            </div>
+            {/* Safari steps */}
+            {iosBrowser === 'safari' && (
+              <>
+                <IosStep n={1} title='Toque nos "···" na barra de endereço' sub="Ícone de três pontos no Safari" />
+                <IosStep n={2} title='Toque em "Compartilhar"' />
+                <IosStep n={3} title='Toque em "Ver mais"' sub="Role o menu para encontrar a opção" />
+                <IosStep n={4} title='Toque em "Adicionar à Tela de Início"' last />
+              </>
+            )}
 
-            <div style={{ display: 'flex', gap: 14 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f5b800', color: '#111', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>3</div>
-              <div>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Toque em <strong>"Adicionar"</strong></p>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>No canto superior direito</p>
-              </div>
-            </div>
+            {/* Chrome steps */}
+            {iosBrowser === 'chrome' && (
+              <>
+                <IosStep n={1} title="Toque no ícone de compartilhar" sub="Ícone na barra de URL, no canto superior" shareIcon />
+                <IosStep n={2} title='Toque em "Ver mais"' sub="Role o menu para encontrar a opção" />
+                <IosStep n={3} title='Toque em "Adicionar à Tela de Início"' last />
+              </>
+            )}
           </div>
         </>
       )}
